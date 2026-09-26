@@ -1,0 +1,19 @@
+'use strict';
+
+const path = require('path');
+const { createApp } = require('./app');
+
+const port = Number(process.env.PORT) || 3000;
+const dataDir = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
+const adminPassword = process.env.ADMIN_PASSWORD || 'admin';
+
+if (!process.env.ADMIN_PASSWORD) {
+  console.warn('⚠️  ADMIN_PASSWORD is not set — using the default password "admin". Set it before going live.');
+}
+
+const { app } = createApp({ dataDir, adminPassword });
+
+app.listen(port, () => {
+  console.log(`🎁 Mystery Box running at http://localhost:${port}`);
+  console.log(`🛠  Backoffice at        http://localhost:${port}/admin`);
+});

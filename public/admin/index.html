@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Backoffice · Mystery Box</title>
+  <meta name="robots" content="noindex" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛠️</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/admin/admin.css" />
+</head>
+<body>
+  <!-- ============ Login ============ -->
+  <section id="login" class="login" hidden>
+    <form id="login-form" class="login-card">
+      <div class="login-logo" aria-hidden="true">🎁</div>
+      <h1>Backoffice</h1>
+      <p class="muted">Sign in to manage prizes and winners.</p>
+      <label class="field">
+        <span>Password</span>
+        <input id="login-password" type="password" autocomplete="current-password" required autofocus />
+      </label>
+      <p id="login-error" class="form-error" hidden></p>
+      <button class="btn btn-primary btn-block" type="submit">Sign in</button>
+      <a class="login-back" href="/">← Back to the game</a>
+    </form>
+  </section>
+
+  <!-- ============ Dashboard ============ -->
+  <div id="dash" class="dash" hidden>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-logo" aria-hidden="true">🎁</span>
+        <span class="brand-name" id="brand-name">Mystery Box</span>
+        <span class="brand-tag">Backoffice</span>
+      </div>
+      <nav class="tabs" role="tablist">
+        <button class="tab" role="tab" data-tab="prizes" aria-selected="true">Prizes</button>
+        <button class="tab" role="tab" data-tab="settings" aria-selected="false">Settings</button>
+        <button class="tab" role="tab" data-tab="winners" aria-selected="false">Winners <span id="winners-count" class="tab-count">0</span></button>
+      </nav>
+      <div class="topbar-actions">
+        <a class="btn btn-ghost" href="/" target="_blank" rel="noopener">Open game ↗</a>
+        <button id="logout" class="btn btn-ghost" type="button">Sign out</button>
+      </div>
+    </header>
+
+    <main class="content">
+      <!-- Prizes -->
+      <section class="panel" data-panel="prizes">
+        <div class="panel-head">
+          <div>
+            <h2>Prizes</h2>
+            <p class="muted">What players can find inside the boxes. Weight sets how likely a prize is; stock limits how many can be won.</p>
+          </div>
+          <button id="add-prize" class="btn btn-primary" type="button">＋ Add prize</button>
+        </div>
+
+        <div class="stats" id="prize-stats"></div>
+
+        <div id="odds-note" class="note" hidden></div>
+        <ul id="prize-list" class="prize-list"></ul>
+        <div id="prize-empty" class="empty" hidden>
+          <div class="empty-art">🎁</div>
+          <h3>No prizes yet</h3>
+          <p class="muted">Add your first prize to start the fun.</p>
+        </div>
+      </section>
+
+      <!-- Settings -->
+      <section class="panel" data-panel="settings" hidden>
+        <div class="panel-head">
+          <div>
+            <h2>Settings</h2>
+            <p class="muted">How the game looks and plays.</p>
+          </div>
+        </div>
+
+        <form id="settings-form" class="card settings-form">
+          <div class="grid-2">
+            <label class="field">
+              <span>Title</span>
+              <input name="title" maxlength="60" required />
+            </label>
+            <label class="field">
+              <span>Subtitle</span>
+              <input name="subtitle" maxlength="160" />
+            </label>
+          </div>
+
+          <div class="field">
+            <span>Number of boxes <output id="box-count-out" class="pill">4</output></span>
+            <input name="boxCount" type="range" min="2" max="12" step="1" />
+            <div class="range-scale"><span>2</span><span>12</span></div>
+          </div>
+
+          <fieldset class="field">
+            <legend>How prizes go into boxes</legend>
+            <div class="choice-grid">
+              <label class="choice">
+                <input type="radio" name="assignment" value="unique" />
+                <span class="choice-body">
+                  <strong>🎯 Different prize in every box</strong>
+                  <span class="muted">Each box holds a different prize (while there are enough). With 4 prizes and 4 boxes, every prize is in play each round. Weight decides which prizes make it in when there are more prizes than boxes.</span>
+                </span>
+              </label>
+              <label class="choice">
+                <input type="radio" name="assignment" value="weighted" />
+                <span class="choice-body">
+                  <strong>🎲 Pure odds</strong>
+                  <span class="muted">Every box is an independent draw, so the same prize can appear in several boxes. Weight maps directly to the chance of winning.</span>
+                </span>
+              </label>
+            </div>
+          </fieldset>
+
+          <div class="grid-2">
+            <label class="switch-row">
+              <input name="showPrizes" type="checkbox" class="switch" />
+              <span>
+                <strong>Show “What's inside?”</strong>
+                <span class="muted">Display the prize lineup above the boxes.</span>
+              </span>
+            </label>
+            <label class="field">
+              <span>Plays per visitor</span>
+              <input name="maxPlaysPerVisitor" type="number" min="0" max="1000" step="1" />
+              <small class="muted">0 = unlimited. Tracked per browser.</small>
+            </label>
+          </div>
+
+          <p id="settings-error" class="form-error" hidden></p>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Save settings</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Winners -->
+      <section class="panel" data-panel="winners" hidden>
+        <div class="panel-head">
+          <div>
+            <h2>Winners</h2>
+            <p class="muted">Every box opened, with claim codes for redeeming prizes.</p>
+          </div>
+          <div class="head-actions">
+            <a class="btn btn-ghost" href="/api/admin/draws.csv" download>Export CSV</a>
+            <button id="clear-draws" class="btn btn-danger-ghost" type="button">Clear log</button>
+          </div>
+        </div>
+
+        <div class="stats" id="draw-stats"></div>
+
+        <div class="card table-card">
+          <div class="table-tools">
+            <input id="draw-search" class="search" type="search" placeholder="Search claim code or prize…" />
+            <select id="draw-filter" class="select">
+              <option value="all">All plays</option>
+              <option value="pending">Wins to redeem</option>
+              <option value="redeemed">Redeemed</option>
+              <option value="nowin">No-win plays</option>
+            </select>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr><th>When</th><th>Prize</th><th>Claim code</th><th class="right">Redeemed</th></tr>
+              </thead>
+              <tbody id="draw-rows"></tbody>
+            </table>
+          </div>
+          <div id="draw-empty" class="empty small" hidden>
+            <div class="empty-art">🏆</div>
+            <p class="muted">No plays yet.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ============ Prize editor ============ -->
+  <dialog id="prize-dialog" class="dialog">
+    <form id="prize-form" method="dialog" class="editor">
+      <div class="editor-main">
+        <header class="dialog-head">
+          <h2 id="prize-dialog-title">Add prize</h2>
+          <button class="icon-close" type="button" data-close aria-label="Close">✕</button>
+        </header>
+
+        <label class="field">
+          <span>Name</span>
+          <input name="name" maxlength="60" required placeholder="e.g. Gift Voucher" />
+        </label>
+        <label class="field">
+          <span>Description</span>
+          <input name="description" maxlength="200" placeholder="e.g. ₱500 shopping voucher" />
+        </label>
+
+        <div class="field">
+          <span>Icon</span>
+          <div class="icon-row">
+            <input name="emoji" class="emoji-input" maxlength="16" aria-label="Emoji" />
+            <div id="emoji-grid" class="emoji-grid"></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <span>Image <small class="muted">(optional — replaces the icon)</small></span>
+          <div class="image-row">
+            <label class="btn btn-ghost file-btn">
+              Upload image
+              <input id="image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+            </label>
+            <input name="image" class="grow" placeholder="…or paste an image URL" />
+            <button id="image-clear" class="btn btn-ghost" type="button">Remove</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <span>Color</span>
+          <div class="color-row">
+            <input name="color" type="color" class="color-input" aria-label="Custom color" />
+            <div id="swatches" class="swatches"></div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <label class="field">
+            <span>Weight <small class="muted">(higher = more likely)</small></span>
+            <input name="weight" type="number" min="0" max="100000" step="1" required />
+          </label>
+          <div class="field">
+            <span>Stock</span>
+            <div class="stock-row">
+              <input name="stock" type="number" min="0" max="1000000" step="1" placeholder="∞" />
+              <label class="check"><input name="unlimited" type="checkbox" /> Unlimited</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <label class="switch-row">
+            <input name="active" type="checkbox" class="switch" />
+            <span><strong>Active</strong><span class="muted">Can appear in boxes.</span></span>
+          </label>
+          <label class="switch-row">
+            <input name="winning" type="checkbox" class="switch" />
+            <span><strong>Counts as a win</strong><span class="muted">Confetti &amp; claim code. Turn off for “Try again”.</span></span>
+          </label>
+        </div>
+
+        <p id="prize-error" class="form-error" hidden></p>
+        <div class="form-actions">
+          <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+          <button class="btn btn-primary" type="submit">Save prize</button>
+        </div>
+      </div>
+
+      <aside class="editor-preview" aria-label="Preview">
+        <span class="preview-label">Preview</span>
+        <div class="preview-card" id="preview-card">
+          <div class="preview-rays"></div>
+          <span class="preview-kicker" id="preview-kicker">🎉 You won 🎉</span>
+          <div class="preview-art" id="preview-art">🎁</div>
+          <strong class="preview-name" id="preview-name">Prize name</strong>
+          <span class="preview-desc" id="preview-desc"></span>
+        </div>
+      </aside>
+    </form>
+  </dialog>
+
+  <!-- ============ Confirm ============ -->
+  <dialog id="confirm-dialog" class="dialog dialog-sm">
+    <form method="dialog" class="confirm">
+      <h2 id="confirm-title">Are you sure?</h2>
+      <p id="confirm-text" class="muted"></p>
+      <div class="form-actions">
+        <button class="btn btn-ghost" value="cancel">Cancel</button>
+        <button class="btn btn-danger" value="ok" id="confirm-ok">Delete</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <script src="/admin/admin.js"></script>
+</body>
+</html>
