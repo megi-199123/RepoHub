@@ -2,26 +2,31 @@
 
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
 const { createApp } = require('../server/app');
+const { openDatabase } = require('../server/db');
+const { Store } = require('../server/store');
 const { fillBoxes } = require('../server/draw');
 
 let server;
 let base;
-let dataDir;
+let db;
 
+// Runs against an in-memory embedded Postgres by default.
+// Set TEST_DATABASE_URL to run against a real (throwaway!) Postgres database.
 before(async () => {
-  dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mystery-box-'));
-  const { app } = createApp({ dataDir, adminPassword: 'hunter2' });
+  db = await openDatabase({ databaseUrl: process.env.TEST_DATABASE_URL, memory: true });
+  if (process.env.TEST_DATABASE_URL) {
+    await db.query('DROP TABLE IF EXISTS settings, prizes, draws, rounds, admin_sessions, images');
+  }
+  const { app, ready } = createApp({ db, adminPassword: 'hunter2' });
+  await ready;
   await new Promise((resolve) => { server = app.listen(0, resolve); });
   base = `http://127.0.0.1:${server.address().port}`;
 });
 
-after(() => {
+after(async () => {
   server.close();
-  fs.rmSync(dataDir, { recursive: true, force: true });
+  await db.close();
 });
 
 /** Minimal cookie-keeping client, so each "browser" has its own visitor id. */
@@ -196,10 +201,38 @@ test('uploads accept images only', async () => {
   assert.equal(bad.status, 400);
 });
 
-test('data persists across restarts', () => {
-  const { store } = createApp({ dataDir, adminPassword: 'x' });
-  assert.ok(store.draws.length > 0);
-  assert.equal(store.prizes.length, 4);
+test('migrations are idempotent and seed only once', async () => {
+  const store = new Store(db);
+  await store.migrate();
+  await store.migrate();
+  assert.equal((await store.listPrizes()).length, 4);
+});
+
+test('a round can be opened only once, even concurrently', async () => {
+  const req = client();
+  const round = await req('POST', '/api/rounds');
+  const results = await Promise.all([0, 1, 2].map((box) => req('POST', `/api/rounds/${round.body.roundId}/pick`, { box })));
+  assert.deepEqual(results.map((r) => r.status).sort(), [200, 404, 404]);
+});
+
+test('the last item in stock cannot be won twice under concurrent picks', async () => {
+  const admin = await adminClient();
+  const prizes = (await admin('GET', '/api/admin/prizes')).body;
+  for (const p of prizes) await admin('PUT', `/api/admin/prizes/${p.id}`, { active: false });
+  const last = (await admin('POST', '/api/admin/prizes', { name: 'Last One', weight: 1, stock: 1 })).body;
+
+  const players = Array.from({ length: 20 }, () => client());
+  const rounds = await Promise.all(players.map((p) => p('POST', '/api/rounds')));
+  const picks = await Promise.all(players.map((p, i) => p('POST', `/api/rounds/${rounds[i].body.roundId}/pick`, { box: 0 })));
+
+  assert.equal(picks.filter((r) => r.status === 200).length, 1);
+  assert.ok(picks.every((r) => r.status === 200 || r.status === 409));
+  const after = (await admin('GET', '/api/admin/prizes')).body.find((p) => p.id === last.id);
+  assert.equal(after.stock, 0);
+  assert.equal(after.won, 1);
+
+  await admin('DELETE', `/api/admin/prizes/${last.id}`);
+  for (const p of prizes) await admin('PUT', `/api/admin/prizes/${p.id}`, { active: p.active });
 });
 
 test('fillBoxes: unique mode never repeats while prizes last; weighted respects weights', () => {

@@ -8,21 +8,23 @@ Players shuffle a set of gift boxes, pick one, and watch it burst open with conf
 
 ```bash
 npm install
-ADMIN_PASSWORD=change-me npm start
+npm run dev
 ```
 
 - Game: <http://localhost:3000>
-- Backoffice: <http://localhost:3000/admin>
+- Backoffice: <http://localhost:3000/admin> (password `admin` until you set `ADMIN_PASSWORD`)
 
-Requires Node.js 18+. The only runtime dependency is Express.
+Requires Node.js 18+. Without `DATABASE_URL`, local development uses [PGlite](https://pglite.dev), an embedded Postgres stored in `./data`, so you don't need a database server to try it out.
 
-| Variable         | Default   | Purpose                                         |
-| ---------------- | --------- | ----------------------------------------------- |
-| `PORT`           | `3000`    | HTTP port                                       |
-| `ADMIN_PASSWORD` | `admin`   | Backoffice password — **set this in production** |
-| `DATA_DIR`       | `./data`  | Where `db.json` and uploaded images are stored  |
+| Variable         | Default   | Purpose                                                                 |
+| ---------------- | --------- | ----------------------------------------------------------------------- |
+| `DATABASE_URL`   | —         | Postgres connection string. **Required in production.**                 |
+| `ADMIN_PASSWORD` | `admin`*  | Backoffice password. *On Vercel there is no default: sign-in is disabled until it's set. |
+| `PORT`           | `3000`    | HTTP port (local / long-running server only)                            |
+| `DATA_DIR`       | `./data`  | Where the embedded local database lives when `DATABASE_URL` is unset    |
+| `PG_POOL_MAX`    | 3 on Vercel, else 10 | Max Postgres connections per instance                      |
 
-Run the tests with `npm test`. Use `npm run dev` to restart automatically on server changes.
+Run the tests with `npm test`. They use an in-memory embedded Postgres; set `TEST_DATABASE_URL` to run them against a real, throwaway database instead. The tests drop and recreate the tables.
 
 ## How it plays
 
@@ -48,6 +50,8 @@ The draw happens on the server, so players can't peek at box contents or pick a 
 
 **Winners**: every box opened, with search and filters, redeem toggles, CSV export and a button to clear the log.
 
+Everything, including uploaded prize images, is stored in Postgres, so no separate file storage is needed.
+
 A prize leaves the draw once its stock hits 0. When no prize is available, players see a friendly "all prizes claimed" message.
 
 ## Project layout
@@ -57,14 +61,35 @@ server/
   index.js    entry point (env config)
   app.js      Express app: public + admin API, auth, validation
   draw.js     box filling, weighted picks, odds estimation
-  store.js    JSON-file persistence with atomic writes
+  db.js       Postgres (pg) or embedded PGlite connection
+  store.js    schema, migrations and all SQL queries
 public/
   index.html, css/app.css, js/app.js, js/fx.js   the game
   admin/                                         the backoffice
+api/index.js  Vercel serverless entry point
+vercel.json   Vercel routing
 test/
   api.test.js
 ```
 
 ## Deploying
 
-Everything is stored in `DATA_DIR`, so mount it on a persistent volume and back it up. Admin sessions and in-progress rounds are kept in memory: restarting the server signs admins out and cancels unopened rounds, but no data is lost. The app is designed to run as a single instance.
+### Vercel + Railway Postgres
+
+1. **Create the database.** In Railway, create a project and add **PostgreSQL**. Open its **Variables** tab and copy `DATABASE_PUBLIC_URL`. Use the public one: the plain `DATABASE_URL` uses Railway's private network, which Vercel can't reach.
+2. **Import the repo into Vercel.** Framework preset and output directory come from `vercel.json`, so leave the defaults.
+3. **Add environment variables** in Vercel → Project → Settings → Environment Variables:
+   - `DATABASE_URL` = the Railway public URL from step 1
+   - `ADMIN_PASSWORD` = a strong password
+4. **Deploy.** Tables are created and the sample prizes seeded automatically on the first request.
+
+Tips:
+
+- If the connection fails with a certificate error, append `?sslmode=no-verify` to `DATABASE_URL`.
+- Every game action makes a few database queries, so put Vercel's function region (Settings → Functions) close to your Railway region.
+
+Any other Postgres works the same way: Neon or Supabase from the Vercel Marketplace, or your own.
+
+### Any Node host (Railway, Render, a VPS, …)
+
+Run `npm start` with `DATABASE_URL` and `ADMIN_PASSWORD` set. On Railway you can run the app in the same project as the database and use the private `DATABASE_URL`.
