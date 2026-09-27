@@ -247,16 +247,6 @@ function createApp({ db, databaseUrl, dataDir, adminPassword, countdownMsOverrid
     next();
   });
 
-  // TEMPORARY (runbook R7): shows the proxy headers the server receives. Remove after verification.
-  app.get('/api/admin/debug/ip', (req, res) => res.json({
-    xForwardedFor: req.headers['x-forwarded-for'] ?? null,
-    xRealIp: req.headers['x-real-ip'] ?? null,
-    xEnvoyExternalAddress: req.headers['x-envoy-external-address'] ?? null,
-    forwarded: req.headers.forwarded ?? null,
-    remoteAddress: req.socket?.remoteAddress ?? null,
-    clientIp: clientIp(req),
-  }));
-
   // ----- admin: settings -----
 
   app.get('/api/admin/settings', async (req, res) => res.json(await store.getSettings()));

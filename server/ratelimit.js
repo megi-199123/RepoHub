@@ -37,8 +37,16 @@ function createLimiter({ max, windowMs }) {
   };
 }
 
-// UNVERIFIED: assumes the hosting edge (Railway) APPENDS the client address to X-Forwarded-For. If it forwards a client-supplied header unchanged, the rightmost entry is spoofable too. Verify after cutover (runbook step R7).
+// VERIFIED on Railway 2026-09-27 (runbook step R7): the edge discards any client-sent
+// X-Forwarded-For / X-Real-IP and sets `X-Forwarded-For: <client>, <edge proxy>` plus
+// `X-Real-IP: <client>`. The rightmost XFF entry is Railway's own edge (shared by many
+// clients), so on Railway the client is X-Real-IP. Elsewhere X-Real-IP is not trusted
+// (a client could set it) and the rightmost XFF entry is used instead.
 function clientIp(req) {
+  if (process.env.RAILWAY_ENVIRONMENT) {
+    const realIp = String(req.headers['x-real-ip'] || '').trim();
+    if (realIp) return realIp;
+  }
   const header = req.headers['x-forwarded-for'];
   if (header) {
     const parts = String(header).split(',').map((s) => s.trim()).filter(Boolean);
