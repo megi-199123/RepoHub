@@ -1,21 +1,7 @@
+/* Color + shared tokens live in public/css/tokens.css, loaded before this file.
+   Only the box-grid's own sizing token stays local (page-specific, non-color). */
 :root {
-  --bg-0: #0d0524;
-  --bg-1: #1a0b3d;
-  --bg-2: #2b1263;
-  --ink: #fbf7ff;
-  --ink-soft: #cbbcf0;
-  --ink-mute: #9483c4;
-  --gold-1: #fde68a;
-  --gold-2: #f59e0b;
-  --gold-3: #b45309;
-  --glass: rgba(255, 255, 255, 0.07);
-  --glass-line: rgba(255, 255, 255, 0.14);
-  --radius: 22px;
-  --font-display: 'Fredoka', 'Baloo 2', ui-rounded, system-ui, sans-serif;
-  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --box-size: clamp(116px, 19vw, 190px);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -28,8 +14,9 @@ body {
   font-family: var(--font-body);
   color: var(--ink);
   background:
-    radial-gradient(1200px 700px at 50% -10%, #4c1d95 0%, transparent 60%),
-    radial-gradient(900px 600px at 100% 100%, #831843 0%, transparent 55%),
+    radial-gradient(1100px 650px at 50% -10%, rgba(255, 107, 91, 0.12) 0%, transparent 60%),
+    radial-gradient(900px 600px at 100% 0%, rgba(31, 181, 166, 0.12) 0%, transparent 55%),
+    radial-gradient(800px 550px at 0% 100%, rgba(255, 201, 60, 0.16) 0%, transparent 55%),
     linear-gradient(180deg, var(--bg-1), var(--bg-0));
   background-attachment: fixed;
   overflow-x: hidden;
@@ -50,11 +37,13 @@ button { font: inherit; color: inherit; }
 
 /* ---------- aurora blobs ---------- */
 
-.aurora { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; filter: blur(70px); opacity: 0.55; }
-.aurora span { position: absolute; width: 42vmax; height: 42vmax; border-radius: 50%; mix-blend-mode: screen; animation: drift 22s ease-in-out infinite alternate; }
-.aurora span:nth-child(1) { background: #7c3aed; top: -12vmax; left: -10vmax; }
-.aurora span:nth-child(2) { background: #db2777; bottom: -18vmax; right: -12vmax; animation-duration: 28s; }
-.aurora span:nth-child(3) { background: #0ea5e9; top: 30%; left: 55%; width: 26vmax; height: 26vmax; opacity: 0.5; animation-duration: 34s; }
+/* Soft daytime blobs — pastel, multiply-blended (never `screen`, which washes out on a
+   light page) so they read as gentle festive color instead of a dark-mode glow. */
+.aurora { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; filter: blur(70px); opacity: 0.6; }
+.aurora span { position: absolute; width: 42vmax; height: 42vmax; border-radius: 50%; mix-blend-mode: multiply; animation: drift 22s ease-in-out infinite alternate; }
+.aurora span:nth-child(1) { background: #ffcabf; top: -12vmax; left: -10vmax; }
+.aurora span:nth-child(2) { background: #bdf0e9; bottom: -18vmax; right: -12vmax; animation-duration: 28s; }
+.aurora span:nth-child(3) { background: #ffedb3; top: 30%; left: 55%; width: 26vmax; height: 26vmax; opacity: 0.8; animation-duration: 34s; }
 
 @keyframes drift {
   from { transform: translate(0, 0) scale(1); }
@@ -91,7 +80,9 @@ button { font: inherit; color: inherit; }
   letter-spacing: 0.02em;
   backdrop-filter: blur(8px);
 }
-.badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #34d399; box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7); animation: ping 2s infinite; }
+/* N13 (code audit): token-hygiene only — this happened to match --green already, just not
+   spelled as the token. */
+.badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7); animation: ping 2s infinite; }
 @keyframes ping { 70% { box-shadow: 0 0 0 8px rgba(52, 211, 153, 0); } 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); } }
 
 .title {
@@ -101,7 +92,7 @@ button { font: inherit; color: inherit; }
   font-size: clamp(44px, 9vw, 92px);
   line-height: 0.95;
   letter-spacing: -0.01em;
-  background: linear-gradient(100deg, #fff 10%, var(--gold-1) 40%, #f9a8d4 65%, #fff 90%);
+  background: linear-gradient(100deg, var(--accent-strong) 10%, var(--gold-3) 40%, var(--support-strong) 65%, var(--accent-strong) 90%);
   background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
@@ -153,9 +144,9 @@ button { font: inherit; color: inherit; }
   font-family: var(--font-display);
   font-size: clamp(18px, 3vw, 24px);
   font-weight: 600;
-  color: var(--gold-1);
+  color: var(--accent-strong);
   text-align: center;
-  text-shadow: 0 2px 20px rgba(245, 158, 11, 0.35);
+  text-shadow: 0 2px 16px rgba(194, 50, 31, 0.18);
 }
 .hint.bump { animation: bump 0.5s var(--ease-spring); }
 @keyframes bump { 40% { transform: scale(1.12); } }
@@ -176,11 +167,28 @@ button { font: inherit; color: inherit; }
   :root { --box-size: clamp(104px, 36vw, 150px); }
 }
 
+/* NF-7 (round-2 audit): .box-glow deliberately overflows its own box (190% width) for the
+   spinning-ray effect. In the shared multiplayer board every revealed, owned box gets
+   `.is-chosen` (not just "your own" box, see board.js), so at 360px several adjacent glows in
+   different prize colors overlap into a muddy blend. Shrink the radius and soften the color
+   stops at narrow widths so neighbours no longer bleed into each other; solo (always at most
+   one `.is-chosen` box) is unaffected in practice. */
+@media (max-width: 480px) {
+  .box-glow {
+    left: -25%;
+    width: 150%;
+    margin-top: -75%;
+    background:
+      radial-gradient(closest-side, color-mix(in srgb, var(--prize, var(--gold-1)) 45%, white), transparent 65%),
+      repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--prize, var(--gold-1)) 35%, transparent) 0 9deg, transparent 9deg 22deg);
+  }
+}
+
 /* ---------- the gift box ---------- */
 
 .box {
-  --c1: #8b5cf6;
-  --c2: #5b21b6;
+  --c1: #ff8a75;
+  --c2: #c2321f;
   --ribbon-1: var(--gold-1);
   --ribbon-2: var(--gold-2);
   position: relative;
@@ -290,7 +298,7 @@ button { font: inherit; color: inherit; }
   border-radius: 999px;
   display: grid; place-items: center;
   background: rgba(255, 255, 255, 0.92);
-  color: #2e1065;
+  color: var(--ink);
   font: 700 15px/1 var(--font-display);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
   transition: opacity 0.3s;
@@ -321,8 +329,8 @@ button { font: inherit; color: inherit; }
   transform: scale(0);
   border-radius: 50%;
   background:
-    radial-gradient(closest-side, color-mix(in srgb, var(--prize, #fde68a) 70%, white), transparent 70%),
-    repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--prize, #fde68a) 55%, transparent) 0 9deg, transparent 9deg 22deg);
+    radial-gradient(closest-side, color-mix(in srgb, var(--prize, var(--gold-1)) 70%, white), transparent 70%),
+    repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--prize, var(--gold-1)) 55%, transparent) 0 9deg, transparent 9deg 22deg);
   -webkit-mask: radial-gradient(closest-side, #000 40%, transparent);
   mask: radial-gradient(closest-side, #000 40%, transparent);
   opacity: 0;
@@ -364,7 +372,7 @@ button { font: inherit; color: inherit; }
 }
 .boxes[data-state='picking'] .box:hover .box-shadow,
 .boxes[data-state='picking'] .box:focus-visible .box-shadow { transform: scale(0.8); opacity: 0.6; }
-.boxes[data-state='picking'] .box:focus-visible .box-body { box-shadow: 0 0 0 4px #fff, 0 0 30px 6px var(--c1); }
+.boxes[data-state='picking'] .box:focus-visible .box-body { box-shadow: 0 0 0 4px var(--ink), 0 0 30px 6px var(--c1); }
 .boxes[data-state='picking'] .box:active .box-inner { transform: translateY(-6px) scale(0.97); }
 
 /* shuffling */
@@ -395,7 +403,7 @@ button { font: inherit; color: inherit; }
 .box.is-chosen .box-glow { animation: glow 6s linear infinite, glow-in 0.6s ease-out forwards; }
 @keyframes glow-in { to { opacity: 1; transform: scale(1); } }
 @keyframes glow { to { rotate: 360deg; } }
-.box.is-chosen .box-label { color: var(--gold-1); font-size: 16px; }
+.box.is-chosen .box-label { color: var(--accent-strong); font-size: 16px; }
 
 .box.is-other { filter: saturate(0.55) brightness(0.8); }
 .box.is-other .box-inner { transform: scale(0.92); }
@@ -578,7 +586,7 @@ button { font: inherit; color: inherit; }
    Scoped to [data-state='picking'] to match the generic rule at line ~367 above,
    which only shows a focus ring while boxes are actually pickable. */
 .boxes[data-style="egg"][data-state='picking'] .box:focus-visible .box-inner {
-  filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 10px var(--c1));
+  filter: drop-shadow(0 0 3px var(--ink)) drop-shadow(0 0 10px var(--c1));
 }
 
 /* ---------- controls ---------- */
@@ -594,17 +602,17 @@ button { font: inherit; color: inherit; }
   cursor: pointer;
   font: 700 clamp(18px, 2.4vw, 22px)/1 var(--font-display);
   letter-spacing: 0.01em;
-  color: #3b0764;
+  color: var(--ink);
   background: linear-gradient(180deg, #fff3c4, var(--gold-1) 30%, var(--gold-2));
   box-shadow:
     0 6px 0 var(--gold-3),
-    0 16px 34px -8px rgba(245, 158, 11, 0.6),
+    0 16px 34px -8px rgba(180, 83, 9, 0.45),
     inset 0 2px 0 rgba(255, 255, 255, 0.8);
   transition: transform 0.15s, box-shadow 0.15s, filter 0.2s, opacity 0.2s;
 }
 .btn-primary:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.05); }
-.btn-primary:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 2px 0 var(--gold-3), 0 8px 20px -8px rgba(245, 158, 11, 0.6), inset 0 2px 0 rgba(255, 255, 255, 0.8); }
-.btn-primary:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
+.btn-primary:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 2px 0 var(--gold-3), 0 8px 20px -8px rgba(180, 83, 9, 0.45), inset 0 2px 0 rgba(255, 255, 255, 0.8); }
+.btn-primary:focus-visible { outline: 3px solid var(--ink); outline-offset: 4px; }
 .btn-primary:disabled { cursor: not-allowed; opacity: 0.45; filter: grayscale(0.4); }
 .btn-primary.small { padding: 14px 30px; font-size: 18px; }
 .btn-shine {
@@ -629,8 +637,8 @@ button { font: inherit; color: inherit; }
   cursor: pointer;
   transition: background 0.2s, transform 0.2s;
 }
-.icon-btn:hover { background: rgba(255, 255, 255, 0.14); transform: scale(1.06); }
-.icon-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.icon-btn:hover { background: rgba(43, 34, 51, 0.1); transform: scale(1.06); }
+.icon-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .icon-btn svg { width: 22px; height: 22px; fill: currentColor; }
 .sound-toggle { position: fixed; z-index: 20; top: max(16px, env(safe-area-inset-top)); right: 16px; }
 .sound-toggle .off { display: none; }
@@ -641,7 +649,7 @@ button { font: inherit; color: inherit; }
 
 .reveal { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; }
 .reveal[hidden] { display: none; }
-.reveal-backdrop { position: absolute; inset: 0; background: rgba(8, 2, 24, 0.66); backdrop-filter: blur(6px); animation: fade 0.4s ease both; }
+.reveal-backdrop { position: absolute; inset: 0; background: rgba(43, 34, 51, 0.45); backdrop-filter: blur(6px); animation: fade 0.4s ease both; }
 @keyframes fade { from { opacity: 0; } }
 
 .reveal-card {
@@ -652,10 +660,10 @@ button { font: inherit; color: inherit; }
   border-radius: 28px;
   text-align: center;
   background:
-    radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--prize) 40%, transparent), transparent 70%),
-    linear-gradient(180deg, #2a1260, #170838);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: 0 40px 80px -20px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--prize) 32%, transparent), transparent 70%),
+    var(--surface);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 30px 70px -24px rgba(43, 34, 51, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.7);
   overflow: hidden;
   animation: card-in 0.7s var(--ease-spring) both;
 }
@@ -699,24 +707,25 @@ button { font: inherit; color: inherit; }
   margin: 22px 0 4px;
   padding: 16px;
   border-radius: 18px;
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px dashed rgba(255, 255, 255, 0.25);
+  background: var(--surface-2);
+  border: 1px dashed var(--line-strong);
   display: flex; flex-direction: column; align-items: center; gap: 8px;
 }
 .claim[hidden] { display: none; }
 .claim-label { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-mute); }
 .claim-code {
-  padding: 6px 14px;
+  min-height: 44px;
+  padding: 10px 18px;
   border: 0;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(43, 34, 51, 0.06);
   font: 700 24px/1.2 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   letter-spacing: 0.08em;
-  color: var(--gold-1);
+  color: var(--accent-strong);
   cursor: copy;
   transition: background 0.2s;
 }
-.claim-code:hover { background: rgba(255, 255, 255, 0.14); }
+.claim-code:hover { background: rgba(43, 34, 51, 0.1); }
 .claim-help { font-size: 13px; color: var(--ink-soft); }
 
 .reveal .btn-primary { margin-top: 22px; }
@@ -731,9 +740,10 @@ button { font: inherit; color: inherit; }
   max-width: calc(100% - 32px);
   padding: 12px 20px;
   border-radius: 14px;
-  background: rgba(20, 8, 48, 0.92);
-  border: 1px solid var(--glass-line);
-  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.6);
+  background: var(--ink);
+  color: var(--bg-0);
+  border: 1px solid rgba(255, 248, 238, 0.14);
+  box-shadow: 0 20px 40px -12px rgba(43, 34, 51, 0.45);
   font-weight: 500;
   animation: toast-in 0.4s var(--ease-spring);
 }

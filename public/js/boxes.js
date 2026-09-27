@@ -4,15 +4,17 @@
   // Pinned by the server (server/rooms/constants.js) — keep in sync.
   const STYLES = ['gift', 'card', 'suitcase', 'chest', 'egg'];
 
+  // "Carnival light" gift-wrap family: coral / teal / sunny-yellow, cycled light-to-deep
+  // so adjacent boxes on the board stay easy to tell apart on a cream/white board.
   const BOX_COLORS = [
-    ['#a78bfa', '#6d28d9'],
-    ['#f472b6', '#be185d'],
-    ['#38bdf8', '#0369a1'],
-    ['#34d399', '#047857'],
-    ['#fb923c', '#c2410c'],
-    ['#f87171', '#b91c1c'],
-    ['#818cf8', '#4338ca'],
-    ['#2dd4bf', '#0f766e'],
+    ['#ff8a75', '#c2321f'], // coral
+    ['#37cfc0', '#0e7a70'], // teal
+    ['#ffd966', '#e8a400'], // sunny yellow
+    ['#ff6b5b', '#9c2415'], // deep coral
+    ['#59d6c7', '#0b5f58'], // deep teal
+    ['#ffc93c', '#c77800'], // gold
+    ['#ff9e8a', '#b9291a'], // coral light
+    ['#7fe3d6', '#127268'], // teal light
   ];
 
   // Extra markup rendered inside .box-body / .box-lid, one entry per display

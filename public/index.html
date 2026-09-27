@@ -4,11 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Mystery Box</title>
-  <meta name="theme-color" content="#1a0b3d" />
+  <meta name="theme-color" content="#FFF8EE" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎁</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/tokens.css" />
   <link rel="stylesheet" href="/css/app.css" />
 </head>
 <body>
@@ -32,8 +33,8 @@
       <ul id="lineup-list" class="lineup-list"></ul>
     </section>
 
-    <section class="stage" aria-live="polite">
-      <p id="hint" class="hint">Loading…</p>
+    <section class="stage">
+      <p id="hint" class="hint" aria-live="polite">Loading…</p>
       <div id="boxes" class="boxes" role="group" aria-label="Mystery boxes"></div>
     </section>
 
@@ -42,7 +43,7 @@
         <span class="btn-shine" aria-hidden="true"></span>
         <span id="play-label">Shuffle &amp; Play</span>
       </button>
-      <p id="plays-left" class="plays-left" hidden></p>
+      <p id="plays-left" class="plays-left" tabindex="-1" hidden></p>
     </div>
   </main>
 

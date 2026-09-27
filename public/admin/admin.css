@@ -1,22 +1,8 @@
+/* Color + shared tokens live in public/css/tokens.css, loaded before this file. The
+   admin-specific alias below keeps every existing `var(--gold)` call site working while
+   pointing at the new dark-amber text-safe token (see tokens.css's --gold-strong). */
 :root {
-  --bg: #0f0a1f;
-  --bg-2: #161029;
-  --surface: #1c1533;
-  --surface-2: #251c42;
-  --line: rgba(255, 255, 255, 0.09);
-  --line-strong: rgba(255, 255, 255, 0.16);
-  --ink: #f5f3ff;
-  --ink-soft: #c4b8e8;
-  --ink-mute: #8c80b3;
-  --accent: #a78bfa;
-  --accent-2: #7c3aed;
-  --gold: #fbbf24;
-  --green: #34d399;
-  --red: #f87171;
-  --radius: 16px;
-  --font-display: 'Fredoka', ui-rounded, system-ui, sans-serif;
-  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  color-scheme: dark;
+  --gold: var(--gold-strong);
 }
 
 * { box-sizing: border-box; }
@@ -28,8 +14,8 @@ body {
   font: 14px/1.5 var(--font-body);
   color: var(--ink);
   background:
-    radial-gradient(900px 500px at 10% -10%, rgba(124, 58, 237, 0.28), transparent 60%),
-    radial-gradient(700px 500px at 110% 10%, rgba(219, 39, 119, 0.16), transparent 60%),
+    radial-gradient(900px 500px at 10% -10%, rgba(255, 107, 91, 0.1), transparent 60%),
+    radial-gradient(700px 500px at 110% 10%, rgba(31, 181, 166, 0.1), transparent 60%),
     var(--bg);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
@@ -51,27 +37,36 @@ button, input, select { font: inherit; color: inherit; }
   border-radius: 12px;
   border: 1px solid transparent;
   background: none;
-  font-weight: 600;
+  /* Explicit (not just inherited) so this always wins over app.css's `.btn-primary` pill
+     typography on pages that load both stylesheets (admin/room.html) — same class name,
+     different component, see the file-header note on public/css/room.css. */
+  font: 600 14px/1 var(--font-body);
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, transform 0.1s, box-shadow 0.15s;
 }
 .btn:active { transform: translateY(1px); }
-.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
 .btn-primary {
   color: #fff;
-  background: linear-gradient(180deg, #8b5cf6, var(--accent-2));
-  box-shadow: 0 8px 20px -8px rgba(124, 58, 237, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent-strong) 88%, black), var(--accent-strong));
+  box-shadow: 0 8px 20px -8px rgba(194, 50, 31, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
-.btn-primary:hover { background: linear-gradient(180deg, #9d74f8, #8b4cf0); }
+.btn-primary:hover { background: linear-gradient(180deg, var(--accent-strong), color-mix(in srgb, var(--accent-strong) 85%, black)); }
 .btn-primary:disabled { opacity: 0.6; cursor: progress; }
-.btn-ghost { border-color: var(--line-strong); background: rgba(255, 255, 255, 0.03); color: var(--ink-soft); }
-.btn-ghost:hover { background: rgba(255, 255, 255, 0.08); color: var(--ink); }
+/* An engine without color-mix() support treats the WHOLE `background` value above as invalid
+   at computed-value time (not just the color-mix() call inside it) and drops it to transparent
+   — leaving .btn-primary's white label on no fill at all. Redefine with a var()-only solid. */
+@supports not (color: color-mix(in srgb, red, blue)) {
+  .btn-primary, .btn-primary:hover { background: var(--accent-strong); }
+}
+.btn-ghost { border-color: var(--line-strong); background: rgba(43, 34, 51, 0.03); color: var(--ink-soft); }
+.btn-ghost:hover { background: rgba(43, 34, 51, 0.07); color: var(--ink); }
 .btn-danger { color: #fff; background: #dc2626; }
-.btn-danger:hover { background: #ef4444; }
-.btn-danger-ghost { border-color: rgba(248, 113, 113, 0.35); color: var(--red); }
-.btn-danger-ghost:hover { background: rgba(248, 113, 113, 0.1); }
+.btn-danger:hover { background: #b91c1c; }
+.btn-danger-ghost { border-color: rgba(220, 38, 38, 0.35); color: var(--red); }
+.btn-danger-ghost:hover { background: rgba(220, 38, 38, 0.08); }
 .btn-block { width: 100%; height: 46px; font-size: 15px; }
 
 .icon-btn {
@@ -84,8 +79,8 @@ button, input, select { font: inherit; color: inherit; }
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
-.icon-btn:hover { background: rgba(255, 255, 255, 0.08); color: var(--ink); }
-.icon-btn.danger:hover { color: var(--red); background: rgba(248, 113, 113, 0.1); }
+.icon-btn:hover { background: rgba(43, 34, 51, 0.07); color: var(--ink); }
+.icon-btn.danger:hover { color: var(--red); background: rgba(220, 38, 38, 0.08); }
 .icon-btn:disabled { opacity: 0.3; cursor: default; background: none; }
 .icon-btn svg { width: 18px; height: 18px; }
 
@@ -108,8 +103,8 @@ button, input, select { font: inherit; color: inherit; }
   display: grid; place-items: center;
   font-size: 40px;
   border-radius: 22px;
-  background: radial-gradient(circle at 30% 25%, #c4b5fd, var(--accent-2));
-  box-shadow: 0 14px 30px -10px rgba(124, 58, 237, 0.9);
+  background: radial-gradient(circle at 30% 25%, #ffb3a3, var(--accent-strong));
+  box-shadow: 0 14px 30px -10px rgba(194, 50, 31, 0.5);
 }
 .login-card h1 { font-size: 28px; }
 .login-card p { margin: 4px 0 0; }
@@ -123,18 +118,24 @@ button, input, select { font: inherit; color: inherit; }
   position: sticky; top: 0; z-index: 10;
   display: flex; align-items: center; gap: 16px;
   padding: 12px 24px;
-  background: rgba(15, 10, 31, 0.75);
+  background: rgba(255, 255, 255, 0.82);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--line);
 }
 .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .brand-logo { font-size: 24px; }
 .brand-name { font: 700 18px/1 var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
-.brand-tag { padding: 3px 8px; border-radius: 6px; background: rgba(167, 139, 250, 0.15); color: var(--accent); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.brand-tag { padding: 3px 8px; border-radius: 6px; background: rgba(255, 107, 91, 0.14); color: var(--accent-strong); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
 
-.tabs { display: flex; gap: 4px; margin: 0 auto; padding: 4px; border-radius: 14px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line); }
+.tabs {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  margin: 0 auto; padding: 4px;
+  border-radius: 14px;
+  background: rgba(43, 34, 51, 0.04);
+  border: 1px solid var(--line);
+}
 .tab {
-  height: 34px; padding: 0 16px;
+  height: 40px; padding: 0 16px;
   border: 0; border-radius: 10px;
   background: none;
   color: var(--ink-mute);
@@ -144,8 +145,8 @@ button, input, select { font: inherit; color: inherit; }
   transition: background 0.15s, color 0.15s;
 }
 .tab:hover { color: var(--ink); }
-.tab[aria-selected='true'] { background: var(--surface-2); color: var(--ink); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); }
-.tab-count { min-width: 20px; padding: 0 6px; border-radius: 999px; background: rgba(167, 139, 250, 0.2); color: var(--accent); font-size: 11px; line-height: 18px; }
+.tab[aria-selected='true'] { background: var(--surface); color: var(--ink); box-shadow: 0 2px 8px rgba(43, 34, 51, 0.16); }
+.tab-count { min-width: 20px; padding: 0 6px; border-radius: 999px; background: rgba(255, 107, 91, 0.16); color: var(--accent-strong); font-size: 11px; line-height: 18px; }
 .topbar-actions { display: flex; gap: 8px; }
 
 /* ---------- layout ---------- */
@@ -168,7 +169,7 @@ button, input, select { font: inherit; color: inherit; }
 .stat-label { display: flex; align-items: center; gap: 6px; color: var(--ink-mute); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
 .stat-value { margin-top: 4px; font: 700 28px/1.1 var(--font-display); }
 
-.note { margin-bottom: 16px; padding: 12px 16px; border-radius: 12px; background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); color: #fde68a; }
+.note { margin-bottom: 16px; padding: 12px 16px; border-radius: 12px; background: rgba(255, 201, 60, 0.16); border: 1px solid rgba(232, 164, 0, 0.4); color: var(--gold-strong); }
 
 /* ---------- prize list ---------- */
 
@@ -202,17 +203,19 @@ button, input, select { font: inherit; color: inherit; }
 .prize-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .prize-title strong { font-size: 16px; }
 .prize-desc { margin: 2px 0 10px; color: var(--ink-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.chip { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: rgba(255, 255, 255, 0.08); color: var(--ink-soft); }
-.chip.warn { background: rgba(251, 191, 36, 0.14); color: var(--gold); }
-.chip.off { background: rgba(248, 113, 113, 0.14); color: var(--red); }
-.chip.info { background: rgba(96, 165, 250, 0.14); color: #93c5fd; }
+.chip { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: rgba(43, 34, 51, 0.06); color: var(--ink-soft); }
+.chip.warn { background: rgba(255, 201, 60, 0.18); color: var(--gold-strong); }
+/* N2 (round-2 audit): --red itself measures only 4.13:1 as text on THIS wash — use the
+   darker text-only variant (tokens.css --red-strong), same fix as .form-error below. */
+.chip.off { background: rgba(220, 38, 38, 0.1); color: var(--red-strong); }
+.chip.info { background: rgba(31, 181, 166, 0.14); color: var(--support-strong); }
 
 .metrics { display: flex; flex-wrap: wrap; gap: 6px 22px; align-items: center; }
 .metric { display: flex; flex-direction: column; }
 .metric-label { font-size: 11px; color: var(--ink-mute); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
 .metric-value { font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
 .odds { flex: 1 1 180px; min-width: 150px; max-width: 280px; }
-.odds-bar { height: 8px; margin-top: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
+.odds-bar { height: 8px; margin-top: 6px; border-radius: 999px; background: rgba(43, 34, 51, 0.08); overflow: hidden; }
 .odds-bar span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, color-mix(in srgb, var(--c) 70%, white), var(--c)); width: 0; transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
 
 .prize-actions { display: flex; align-items: center; gap: 2px; }
@@ -223,24 +226,31 @@ button, input, select { font: inherit; color: inherit; }
 .field { display: flex; flex-direction: column; gap: 6px; margin: 0 0 16px; border: 0; padding: 0; min-width: 0; }
 .field > span, .field > legend { font-weight: 600; color: var(--ink-soft); font-size: 13px; display: flex; align-items: center; gap: 8px; padding: 0; }
 .field legend { margin-bottom: 8px; }
-input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']), .select {
+/* :where() zeroes the :not() chain's specificity so this reset never outranks a more
+   specific "make this one input a fixed width" rule elsewhere (e.g. .host-countdown-row
+   input[type='number'], .emoji-input) — that used to require !important / hand-tuned
+   specificity races (see C1 in the round-1 UI/UX audit: the countdown number input used
+   to win this fight and crush "Start countdown" down to ~33px). */
+input:where(:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color'])), .select {
   height: 42px;
   width: 100%;
   padding: 0 12px;
   border-radius: 12px;
   border: 1px solid var(--line-strong);
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--surface-2);
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-input:focus-visible, .select:focus-visible { border-color: var(--accent) !important; box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.25); }
-input::placeholder { color: #6b6190; }
-.form-error { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: rgba(248, 113, 113, 0.12); color: #fecaca; }
+input:focus-visible, .select:focus-visible { border-color: var(--accent-strong) !important; box-shadow: 0 0 0 3px rgba(194, 50, 31, 0.18); }
+input::placeholder { color: var(--ink-mute); }
+/* N2 (round-2 audit): --red text on its own wash measured 4.28:1 (white card) / 3.92:1 (the
+   login card's darker gradient end) — both real AA fails. Use the darker text-only variant. */
+.form-error { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: rgba(220, 38, 38, 0.08); color: var(--red-strong); }
 .form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
-.pill { padding: 1px 10px; border-radius: 999px; background: rgba(167, 139, 250, 0.2); color: var(--accent); font-weight: 700; }
+.pill { padding: 1px 10px; border-radius: 999px; background: rgba(255, 107, 91, 0.16); color: var(--accent-strong); font-weight: 700; }
 
-input[type='range'] { width: 100%; accent-color: var(--accent-2); height: 24px; }
+input[type='range'] { width: 100%; accent-color: var(--accent-strong); height: 24px; }
 .range-scale { display: flex; justify-content: space-between; color: var(--ink-mute); font-size: 12px; }
 
 .settings-form { padding: 24px; max-width: 820px; }
@@ -254,12 +264,12 @@ input[type='range'] { width: 100%; accent-color: var(--accent-2); height: 24px; 
   padding: 16px;
   border-radius: 14px;
   border: 1.5px solid var(--line-strong);
-  background: rgba(0, 0, 0, 0.18);
+  background: var(--surface-2);
   transition: border-color 0.15s, background 0.15s;
 }
 .choice-body .muted { font-size: 13px; line-height: 1.45; }
-.choice input:checked + .choice-body { border-color: var(--accent); background: rgba(167, 139, 250, 0.1); box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.15); }
-.choice input:focus-visible + .choice-body { outline: 2px solid var(--accent); outline-offset: 2px; }
+.choice input:checked + .choice-body { border-color: var(--accent-strong); background: rgba(255, 107, 91, 0.08); box-shadow: 0 0 0 3px rgba(255, 107, 91, 0.16); }
+.choice input:focus-visible + .choice-body { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
 
 .switch-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; cursor: pointer; }
 .switch-row > span { display: flex; flex-direction: column; }
@@ -272,25 +282,26 @@ input[type='range'] { width: 100%; accent-color: var(--accent-2); height: 24px; 
   width: 40px; height: 24px;
   margin: 0;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(43, 34, 51, 0.2);
+  border: 1px solid rgba(43, 34, 51, 0.12);
   cursor: pointer;
   transition: background 0.2s;
 }
 .switch::after {
   content: '';
-  position: absolute; top: 3px; left: 3px;
+  position: absolute; top: 2px; left: 2px;
   width: 18px; height: 18px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 3px rgba(43, 34, 51, 0.4);
   transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.switch:checked { background: var(--green); }
+.switch:checked { background: var(--green-strong); border-color: transparent; }
 .switch:checked::after { transform: translateX(16px); }
-.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
 
 .check { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; color: var(--ink-soft); cursor: pointer; }
-.check input { accent-color: var(--accent-2); width: 16px; height: 16px; }
+.check input { accent-color: var(--accent-strong); width: 16px; height: 16px; }
 
 /* ---------- dialog ---------- */
 
@@ -300,37 +311,51 @@ input[type='range'] { width: 100%; accent-color: var(--accent-2); height: 24px; 
   padding: 0;
   border-radius: 22px;
   border: 1px solid var(--line-strong);
-  background: var(--bg-2);
   color: var(--ink);
-  box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 40px 100px -20px rgba(43, 34, 51, 0.35);
+  overflow-y: auto;
+  /* N1 (browser audit): a scrollable dialog on a short viewport (e.g. the Add/Edit prize
+     form at 360px) gave no visual hint that Cancel/Save were reachable below the fold. The
+     two `local`-attached layers repaint the solid background and hide the shadow layers
+     whenever there's nothing left to scroll past on that edge; the two `scroll`-attached
+     layers are the shadow itself, fixed to the dialog's own box. */
+  background:
+    linear-gradient(var(--bg-2) 30%, rgba(255, 255, 255, 0)) local,
+    linear-gradient(rgba(255, 255, 255, 0), var(--bg-2) 70%) local,
+    radial-gradient(farthest-side at 50% 0, rgba(43, 34, 51, 0.16), rgba(43, 34, 51, 0)) scroll,
+    radial-gradient(farthest-side at 50% 100%, rgba(43, 34, 51, 0.16), rgba(43, 34, 51, 0)) scroll;
+  background-repeat: no-repeat;
+  background-position: 0 0, 0 100%, 0 0, 0 100%;
+  background-size: 100% 40px, 100% 40px, 100% 12px, 100% 12px;
 }
 .dialog[open] { animation: rise 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
-.dialog::backdrop { background: rgba(5, 2, 15, 0.7); backdrop-filter: blur(4px); }
+.dialog::backdrop { background: rgba(43, 34, 51, 0.45); backdrop-filter: blur(4px); }
 .dialog-sm { width: min(420px, calc(100% - 24px)); }
 .dialog-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
-.icon-close { width: 34px; height: 34px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.06); cursor: pointer; }
-.icon-close:hover { background: rgba(255, 255, 255, 0.12); }
+.icon-close { width: 34px; height: 34px; border: 0; border-radius: 10px; background: rgba(43, 34, 51, 0.05); cursor: pointer; }
+.icon-close:hover { background: rgba(43, 34, 51, 0.1); }
 
 .editor { display: grid; grid-template-columns: 1fr 300px; }
 .editor-main { padding: 24px; min-width: 0; }
 .editor-preview {
   padding: 24px;
   border-left: 1px solid var(--line);
-  background: radial-gradient(400px 300px at 50% 30%, rgba(124, 58, 237, 0.2), transparent), var(--bg);
+  background: radial-gradient(400px 300px at 50% 30%, rgba(255, 107, 91, 0.12), transparent), var(--bg);
   border-radius: 0 22px 22px 0;
   display: flex; flex-direction: column; gap: 12px;
 }
 .preview-label { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-mute); }
 .preview-card {
-  --c: #8b5cf6;
+  --c: #ff6b5b;
   position: sticky; top: 24px;
   padding: 26px 18px 24px;
   border-radius: 22px;
   text-align: center;
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   overflow: hidden;
-  background: radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--c) 40%, transparent), transparent 70%), linear-gradient(180deg, #2a1260, #170838);
+  background: radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--c) 32%, transparent), transparent 70%), var(--surface);
   border: 1px solid var(--line-strong);
+  box-shadow: 0 20px 50px -24px rgba(43, 34, 51, 0.3);
 }
 .preview-rays {
   position: absolute; left: 50%; top: 95px;
@@ -364,17 +389,33 @@ input[type='range'] { width: 100%; accent-color: var(--accent-2); height: 24px; 
 .emoji-grid button {
   width: 34px; height: 34px;
   border: 1px solid transparent; border-radius: 9px;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(43, 34, 51, 0.04);
   font-size: 18px;
   cursor: pointer;
   transition: transform 0.1s, background 0.15s;
 }
-.emoji-grid button:hover { background: rgba(255, 255, 255, 0.12); transform: scale(1.12); }
-.emoji-grid button[aria-pressed='true'] { border-color: var(--accent); background: rgba(167, 139, 250, 0.18); }
+.emoji-grid button:hover { background: rgba(43, 34, 51, 0.1); transform: scale(1.12); }
+.emoji-grid button[aria-pressed='true'] { border-color: var(--accent-strong); background: rgba(255, 107, 91, 0.16); }
 
 .image-row, .color-row, .stock-row { display: flex; gap: 10px; align-items: center; }
 .grow { flex: 1; min-width: 0; }
-.file-btn { flex: none; }
+/* NF-4/M6 (round-2 audit): the file input used to carry the `hidden` attribute, and
+   `[hidden]{display:none!important}` (top of this file) removes ANY element from the tab
+   order regardless of tabindex — no keyboard user could ever reach it. Keep it in normal flow
+   and focusable, just visually invisible and stretched over its own label so a click anywhere
+   on "Upload image" still hits the real input, and Tab can reach it too. */
+.file-btn { flex: none; position: relative; }
+.file-input-visually-hidden {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.file-btn:focus-within { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
 .color-input { flex: none; width: 46px; height: 42px; padding: 0; border: 1px solid var(--line-strong); border-radius: 12px; background: none; cursor: pointer; }
 .color-input::-webkit-color-swatch-wrapper { padding: 4px; }
 .color-input::-webkit-color-swatch { border: 0; border-radius: 8px; }
@@ -389,7 +430,7 @@ input[type='range'] { width: 100%; accent-color: var(--accent-2); height: 24px; 
   transition: transform 0.1s;
 }
 .swatches button:hover { transform: scale(1.12); }
-.swatches button[aria-pressed='true'] { border-color: #fff; }
+.swatches button[aria-pressed='true'] { border-color: var(--ink); box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.15), 0 0 0 2px #fff; }
 
 .confirm { padding: 24px; }
 .confirm h2 { font-size: 22px; }
@@ -403,9 +444,9 @@ input[type='range'] { width: 100%; accent-color: var(--accent-2); height: 24px; 
 .select { width: auto !important; min-width: 170px; cursor: pointer; }
 .table-wrap { overflow-x: auto; }
 .table { width: 100%; border-collapse: collapse; }
-.table th { padding: 10px 16px; text-align: left; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-mute); background: rgba(255, 255, 255, 0.02); }
+.table th { padding: 10px 16px; text-align: left; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-mute); background: rgba(43, 34, 51, 0.02); }
 .table td { padding: 12px 16px; border-top: 1px solid var(--line); white-space: nowrap; }
-.table tr:hover td { background: rgba(255, 255, 255, 0.02); }
+.table tr:hover td { background: rgba(43, 34, 51, 0.025); }
 .table .right { text-align: right; }
 .cell-prize { display: flex; align-items: center; gap: 10px; }
 .cell-emoji { font-size: 20px; }
@@ -426,13 +467,14 @@ input[type='range'] { width: 100%; accent-color: var(--accent-2); height: 24px; 
   display: flex; align-items: center; gap: 10px;
   padding: 12px 16px;
   border-radius: 12px;
-  background: #2a2046;
-  border: 1px solid var(--line-strong);
-  box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.7);
+  background: var(--ink);
+  color: var(--bg-0);
+  border: 1px solid rgba(255, 248, 238, 0.14);
+  box-shadow: 0 16px 40px -10px rgba(43, 34, 51, 0.5);
   font-weight: 500;
   animation: toast-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.toast.error { border-color: rgba(248, 113, 113, 0.5); }
+.toast.error { border-color: rgba(255, 138, 138, 0.6); }
 .toast.out { opacity: 0; transform: translateY(8px); transition: 0.25s; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(16px) scale(0.95); } }
 
@@ -504,27 +546,44 @@ input[type='range'] { width: 100%; accent-color: var(--accent-2); height: 24px; 
   gap: 8px;
   padding: 6px 8px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(43, 34, 51, 0.03);
 }
 .host-player-avatar {
   width: 26px; height: 26px; flex: none;
   display: grid; place-items: center;
   border-radius: 50%;
   font-size: 13px;
-  background: color-mix(in srgb, var(--chip-color, #8b5cf6) 55%, #1a0b3d);
+  background: color-mix(in srgb, var(--chip-color, var(--accent)) 55%, var(--avatar-mix-base));
 }
-.host-player-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: #64748b; }
-.host-player.is-connected .host-player-dot { background: var(--green); }
+/* NF-5 (round-2 audit): color-only presence — hollow ring when offline, filled when online,
+   plus a sr-only "Online"/"Away" text node (admin/room.js) carries the meaning for AT. */
+.host-player-dot { width: 8px; height: 8px; flex: none; box-sizing: border-box; border-radius: 50%; background: transparent; border: 1.5px solid var(--ink-mute); }
+.host-player.is-connected .host-player-dot { background: var(--green); border-color: var(--green); }
 .host-player-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .host-kick { flex: none; }
-.chip.ok { background: rgba(52, 211, 153, 0.16); color: var(--green); }
+/* N17 (code review): while a kick ack is in flight, that one button grows to fit a "Kicking…"
+   label instead of just the ✕ glyph. The 3-class selector outranks both `.icon-btn`'s fixed
+   34px box and the touch/mobile `.host-kick.icon-btn` 44px override below, in either order. */
+.host-player .host-kick.is-kicking {
+  width: auto;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 1;
+}
+@media (max-width: 860px), (pointer: coarse) {
+  .host-player .host-kick.is-kicking { height: 44px; }
+}
+.chip.ok { background: rgba(4, 120, 87, 0.14); color: var(--green-strong); }
 
 .host-actions { display: flex; flex-direction: column; gap: 10px; }
-.host-countdown-row { display: flex; gap: 8px; }
-.host-countdown-row input[type='number'] { width: 84px; flex: none; }
-.host-countdown-row .btn { flex: 1; }
+.host-countdown-row { display: flex; gap: 8px; align-items: stretch; }
+.host-countdown-row input[type='number'] { width: 84px; flex: none; text-align: center; }
+.host-countdown-row .btn { flex: 1; min-width: 0; padding: 0 12px; white-space: normal; text-align: center; }
 .host-reveal-row { display: flex; gap: 8px; }
-.host-reveal-row .btn { flex: 1; }
+.host-reveal-row .btn { flex: 1; min-width: 0; padding: 0 10px; }
 
 @media (min-width: 900px) {
   .host-layout { flex-direction: row; align-items: flex-start; }
@@ -550,4 +609,36 @@ input[type='range'] { width: 100%; accent-color: var(--accent-2); height: 24px; 
   .brand-tag, .topbar-actions .btn-ghost[href] { display: none; }
   .table-tools { flex-direction: column; }
   .select { width: 100% !important; }
+
+  /* C2: a single flex row of 4 tabs (one carrying a count badge) doesn't fit a 360px
+     viewport — wrap to a 2x2 grid instead so every tab (incl. the Winners badge) stays
+     fully on-screen with no horizontal scroll. */
+  .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .tab { width: 100%; }
+
+  /* Winners table: swap the scrolling grid for stacked "cards" — each row becomes a
+     labeled block instead of forcing a sideways scroll to reach Claim code / Redeemed. */
+  .table-wrap { overflow-x: visible; }
+  .table, .table thead, .table tbody, .table tr, .table th, .table td { display: block; width: 100%; }
+  .table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .table tbody { display: flex; flex-direction: column; gap: 10px; padding: 10px; }
+  .table tr { border: 1px solid var(--line); border-radius: 14px; padding: 4px 4px 8px; background: var(--surface); }
+  .table td { border-top: 0; padding: 6px 12px; white-space: normal; }
+  .table td.right { text-align: left; }
+  .table td::before { content: attr(data-label); display: block; margin-bottom: 2px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-mute); }
+}
+
+/* Tap targets on touch/mobile widths (B.8): icon buttons, tabs and switches grow to a
+   44px hit area (padding, not the visual glyph) without changing their visual size. */
+@media (max-width: 860px), (pointer: coarse) {
+  .icon-btn { width: 44px; height: 44px; }
+  .tab { min-height: 44px; }
+  .switch { margin: 10px 0; }
+  .prize-actions .switch { margin: 0 8px 0 0; }
+  .host-kick.icon-btn { width: 44px; height: 44px; }
+  /* The switch stays visually 40×24 (its track shape is part of the design language) but its
+     hit-testable area grows to ~44px in both dimensions via an invisible ::before, for the
+     bare `<input class="switch">` instances that aren't already wrapped in a full-row label
+     (prize-list "Active" toggle, Winners table "Redeemed" checkbox). */
+  .switch::before { content: ''; position: absolute; inset: -10px -4px; }
 }

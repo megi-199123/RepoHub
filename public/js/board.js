@@ -296,6 +296,12 @@
       const playersById = new Map(view.players.map((p) => [p.id, p]));
       let anyNewlyRevealed = false;
 
+      // N5 (browser audit): looking these names up via `ownerNameFor` (which reads the
+      // *previous* `curView`, since `curView = view` only happens at the end of this
+      // function) made a box's tooltip fall back to "someone's box" for one render after a
+      // reconnect — use the just-received view's own player list instead.
+      const nameFor = (playerId) => (playersById.get(playerId) || {}).name || 'someone';
+
       for (let i = 0; i < view.boxCount; i++) {
         const box = boxEls[i];
         const bv = view.boxes[i];
@@ -323,13 +329,17 @@
           box.classList.toggle('is-chosen', Boolean(bv.playerId));
           box.classList.toggle('is-other', !bv.playerId);
           if (selfId != null && bv.playerId === selfId) box.classList.add('is-mine');
+          // NF-2 (code audit): this used to only include the prize name on the viewer's OWN
+          // box, so every other box — and every box on the host console, which has no selfId
+          // at all — announced just "Box N — Name's box" with no outcome. Mirror app.js's solo
+          // fix: always state the prize once revealed, for every viewer.
           box.setAttribute(
             'aria-label',
             selfId != null && bv.playerId === selfId
               ? `Your box — ${bv.prize ? bv.prize.name : 'no prize'}`
               : bv.playerId
-                ? `Box ${i + 1} — ${ownerNameFor(bv.playerId)}'s box`
-                : `Box ${i + 1}`,
+                ? `Box ${i + 1} — ${nameFor(bv.playerId)}'s box — ${bv.prize ? bv.prize.name : 'no prize'}`
+                : `Box ${i + 1} — ${bv.prize ? bv.prize.name : 'no prize'}`,
           );
           box.tabIndex = -1;
           box.setAttribute('aria-disabled', 'true');
@@ -342,7 +352,9 @@
               box.style.setProperty('--owner', owner.color);
               chip.hidden = false;
               chip.querySelector('.owner-avatar').textContent = owner.avatar;
-              chip.querySelector('.owner-name').textContent = owner.name;
+              const ownerNameEl = chip.querySelector('.owner-name');
+              ownerNameEl.textContent = owner.name;
+              ownerNameEl.title = owner.name; // Mi2: the chip truncates long names with an ellipsis
             }
             if (selfId != null && bv.playerId === selfId) box.classList.add('is-mine');
           }
@@ -354,7 +366,7 @@
             selfId != null && bv.playerId === selfId
               ? 'Your box — tap to release'
               : bv.playerId
-                ? `Box ${i + 1} — taken by ${ownerNameFor(bv.playerId)}`
+                ? `Box ${i + 1} — taken by ${nameFor(bv.playerId)}`
                 : `Lock box ${i + 1}`,
           );
         }

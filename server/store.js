@@ -126,6 +126,10 @@ function toDraw(r) {
     redeemedAt: r.redeemed_at,
     roomId: r.room_id,
     playerName: r.player_name,
+    // Only present when the row came from listDraws()'s join below; undefined elsewhere (e.g. the
+    // plain RETURNING * of insertDraw/setRedeemed), which is fine since only the admin list/export
+    // needs it.
+    roomCode: r.room_code,
   };
 }
 
@@ -333,8 +337,14 @@ class Store {
     return toDraw(row);
   }
 
+  /** Left-joined to the room's code (never its internal id) so admin views/exports can show which
+   *  room a draw belongs to without a second round-trip; solo draws (room_id NULL) get room_code NULL. */
   async listDraws() {
-    return (await this.db.query('SELECT * FROM draws ORDER BY created_at DESC')).map(toDraw);
+    return (await this.db.query(
+      `SELECT d.*, r.code AS room_code
+       FROM draws d LEFT JOIN rooms r ON r.id = d.room_id
+       ORDER BY d.created_at DESC`,
+    )).map(toDraw);
   }
 
   async setRedeemed(id, redeemed) {

@@ -52,6 +52,20 @@
     return `<div class="stat"><div class="stat-label">${label}</div><div class="stat-value">${value}</div></div>`;
   }
 
+  // NF-3/M4 (code audit): the Settings and Login forms had no double-submit guard at all, and
+  // even the forms that DID disable their submit button (Prize, Room) gave no busy feedback
+  // beyond that. One helper for all four: disables the button and swaps its label for the
+  // duration, restoring both afterwards no matter how the handler exits.
+  function withBusy(button, busyText, fn) {
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = busyText;
+    return fn().finally(() => {
+      button.disabled = false;
+      button.textContent = original;
+    });
+  }
+
   function confirmDialog({ title, text, ok = 'Delete' }) {
     const dlg = $('#confirm-dialog');
     $('#confirm-title').textContent = title;
@@ -76,19 +90,22 @@
     await Promise.all([loadPrizes(), loadSettings(), loadDraws()]);
   }
 
-  $('#login-form').addEventListener('submit', async (e) => {
+  $('#login-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const err = $('#login-error');
     err.hidden = true;
-    try {
-      await api('/api/admin/login', { method: 'POST', body: JSON.stringify({ password: $('#login-password').value }) });
-      $('#login-password').value = '';
-      await showDash();
-    } catch (error) {
-      err.textContent = error.message;
-      err.hidden = false;
-      $('.login-card').animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-8px)' }, { transform: 'translateX(8px)' }, { transform: 'translateX(0)' }], { duration: 300 });
-    }
+    const submit = $('button[type=submit]', e.target);
+    withBusy(submit, 'Signing in…', async () => {
+      try {
+        await api('/api/admin/login', { method: 'POST', body: JSON.stringify({ password: $('#login-password').value }) });
+        $('#login-password').value = '';
+        await showDash();
+      } catch (error) {
+        err.textContent = error.message;
+        err.hidden = false;
+        $('.login-card').animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-8px)' }, { transform: 'translateX(8px)' }, { transform: 'translateX(0)' }], { duration: 300 });
+      }
+    });
   });
 
   $('#logout').addEventListener('click', async () => {
@@ -154,7 +171,7 @@
           <div class="prize-art">${artHtml(p)}</div>
           <div class="prize-main">
             <div class="prize-title"><strong>${esc(p.name)}</strong>${chips.join('')}</div>
-            <p class="prize-desc">${esc(p.description) || '<span class="muted">No description</span>'}</p>
+            <p class="prize-desc"${p.description ? ` title="${esc(p.description)}"` : ''}>${esc(p.description) || '<span class="muted">No description</span>'}</p>
             <div class="metrics">
               <div class="metric"><span class="metric-label">Weight</span><span class="metric-value">${fmt(p.weight)}</span></div>
               <div class="metric"><span class="metric-label">Stock</span><span class="metric-value">${p.stock === null ? '∞' : fmt(p.stock)}</span></div>
@@ -308,7 +325,7 @@
 
   for (const b of $$('[data-close]', dialog)) b.addEventListener('click', () => dialog.close());
 
-  form.addEventListener('submit', async (e) => {
+  form.addEventListener('submit', (e) => {
     e.preventDefault();
     const body = {
       name: form.name.value,
@@ -321,20 +338,24 @@
       active: form.active.checked,
       winning: form.winning.checked,
     };
+    // NF-6/M3 (code audit): reset before every attempt (not just when the dialog first opens)
+    // so a second submit that hits the SAME error still mutates the DOM (hidden -> visible)
+    // and gets re-announced by `role="alert"`, instead of silently no-op'ing because the text
+    // and visibility never actually changed.
+    $('#prize-error').hidden = true;
     const submit = $('button[type=submit]', form);
-    submit.disabled = true;
-    try {
-      if (state.editing) await api(`/api/admin/prizes/${state.editing.id}`, { method: 'PUT', body: JSON.stringify(body) });
-      else await api('/api/admin/prizes', { method: 'POST', body: JSON.stringify(body) });
-      dialog.close();
-      toast(state.editing ? 'Prize updated' : 'Prize added');
-      await loadPrizes();
-    } catch (err) {
-      $('#prize-error').textContent = err.message;
-      $('#prize-error').hidden = false;
-    } finally {
-      submit.disabled = false;
-    }
+    withBusy(submit, 'Saving…', async () => {
+      try {
+        if (state.editing) await api(`/api/admin/prizes/${state.editing.id}`, { method: 'PUT', body: JSON.stringify(body) });
+        else await api('/api/admin/prizes', { method: 'POST', body: JSON.stringify(body) });
+        dialog.close();
+        toast(state.editing ? 'Prize updated' : 'Prize added');
+        await loadPrizes();
+      } catch (err) {
+        $('#prize-error').textContent = err.message;
+        $('#prize-error').hidden = false;
+      }
+    });
   });
 
   $('#add-prize').addEventListener('click', () => openEditor());
@@ -355,33 +376,39 @@
     settingsForm.showPrizes.checked = s.showPrizes;
     settingsForm.maxPlaysPerVisitor.value = s.maxPlaysPerVisitor;
     $('#brand-name').textContent = s.title;
+    $('#brand-name').title = s.title;
     if (state.prizes.length) renderPrizes();
   }
 
   settingsForm.boxCount.addEventListener('input', () => { $('#box-count-out').textContent = settingsForm.boxCount.value; });
 
-  settingsForm.addEventListener('submit', async (e) => {
+  settingsForm.addEventListener('submit', (e) => {
     e.preventDefault();
     $('#settings-error').hidden = true;
-    try {
-      await api('/api/admin/settings', {
-        method: 'PUT',
-        body: JSON.stringify({
-          title: settingsForm.title.value,
-          subtitle: settingsForm.subtitle.value,
-          boxCount: Number(settingsForm.boxCount.value),
-          boxStyle: settingsForm.boxStyle.value,
-          assignment: settingsForm.assignment.value,
-          showPrizes: settingsForm.showPrizes.checked,
-          maxPlaysPerVisitor: Number(settingsForm.maxPlaysPerVisitor.value || 0),
-        }),
-      });
-      await Promise.all([loadSettings(), loadPrizes()]);
-      toast('Settings saved');
-    } catch (err) {
-      $('#settings-error').textContent = err.message;
-      $('#settings-error').hidden = false;
-    }
+    // NF-3 (code audit): the only one of the four admin forms with no double-submit guard at
+    // all — a real dblclick fired two PUT /api/admin/settings requests.
+    const submit = $('button[type=submit]', settingsForm);
+    withBusy(submit, 'Saving…', async () => {
+      try {
+        await api('/api/admin/settings', {
+          method: 'PUT',
+          body: JSON.stringify({
+            title: settingsForm.title.value,
+            subtitle: settingsForm.subtitle.value,
+            boxCount: Number(settingsForm.boxCount.value),
+            boxStyle: settingsForm.boxStyle.value,
+            assignment: settingsForm.assignment.value,
+            showPrizes: settingsForm.showPrizes.checked,
+            maxPlaysPerVisitor: Number(settingsForm.maxPlaysPerVisitor.value || 0),
+          }),
+        });
+        await Promise.all([loadSettings(), loadPrizes()]);
+        toast('Settings saved');
+      } catch (err) {
+        $('#settings-error').textContent = err.message;
+        $('#settings-error').hidden = false;
+      }
+    });
   });
 
   // ---------- rooms ----------
@@ -419,7 +446,7 @@
 
   $('#room-created-copy').addEventListener('click', () => copyInvite($('#room-created').dataset.code));
 
-  roomForm.addEventListener('submit', async (e) => {
+  roomForm.addEventListener('submit', (e) => {
     e.preventDefault();
     $('#room-error').hidden = true;
     const body = {
@@ -429,18 +456,17 @@
     const seconds = roomForm.countdownSeconds.value.trim();
     if (seconds !== '') body.countdownSeconds = Number(seconds);
     const submit = $('button[type=submit]', roomForm);
-    submit.disabled = true;
-    try {
-      const room = await api('/api/admin/rooms', { method: 'POST', body: JSON.stringify(body) });
-      showRoomCreated(room);
-      toast(`Room ${room.code} created`);
-      await loadRooms();
-    } catch (err) {
-      $('#room-error').textContent = err.message;
-      $('#room-error').hidden = false;
-    } finally {
-      submit.disabled = false;
-    }
+    withBusy(submit, 'Creating…', async () => {
+      try {
+        const room = await api('/api/admin/rooms', { method: 'POST', body: JSON.stringify(body) });
+        showRoomCreated(room);
+        toast(`Room ${room.code} created`);
+        await loadRooms();
+      } catch (err) {
+        $('#room-error').textContent = err.message;
+        $('#room-error').hidden = false;
+      }
+    });
   });
 
   function statusChipClass(status) {
@@ -530,11 +556,11 @@
         : '<span class="muted">—</span>';
       return `
         <tr data-id="${esc(d.id)}">
-          <td class="when">${date.toLocaleDateString()}<small>${date.toLocaleTimeString()}</small></td>
-          <td>${playerCell}</td>
-          <td><span class="cell-prize"><span class="cell-emoji">${esc(d.emoji)}</span>${esc(d.prizeName)}</span></td>
-          <td>${d.code ? `<span class="code">${esc(d.code)}</span>` : '<span class="muted">— no win —</span>'}</td>
-          <td class="right">${d.code ? `<input type="checkbox" class="switch" ${d.redeemed ? 'checked' : ''} aria-label="Redeemed" />` : ''}</td>
+          <td class="when" data-label="When">${date.toLocaleDateString()}<small>${date.toLocaleTimeString()}</small></td>
+          <td data-label="Player">${playerCell}</td>
+          <td data-label="Prize"><span class="cell-prize"><span class="cell-emoji">${esc(d.emoji)}</span>${esc(d.prizeName)}</span></td>
+          <td data-label="Claim code">${d.code ? `<span class="code">${esc(d.code)}</span>` : '<span class="muted">— no win —</span>'}</td>
+          <td class="right" data-label="Redeemed">${d.code ? `<input type="checkbox" class="switch" ${d.redeemed ? 'checked' : ''} aria-label="Redeemed" />` : ''}</td>
         </tr>`;
     }).join('');
   }
@@ -569,6 +595,14 @@
   });
 
   // ---------- boot ----------
+
+  // M5 (browser audit): the hash was only ever read once at boot, so editing the URL bar (or
+  // opening a bookmarked deep link in a tab that already had /admin loaded) did nothing.
+  window.addEventListener('hashchange', () => {
+    if ($('#dash').hidden) return; // not signed in yet — boot's initial-hash read still applies
+    const tab = location.hash.slice(1);
+    if (['prizes', 'settings', 'rooms', 'winners'].includes(tab)) selectTab(tab);
+  });
 
   (async () => {
     const { authenticated } = await api('/api/admin/me');

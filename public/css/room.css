@@ -11,10 +11,9 @@
   width: min(420px, 100%);
   padding: 30px 26px;
   border-radius: var(--radius);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
-  border: 1px solid var(--glass-line);
-  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(10px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 60px -30px rgba(43, 34, 51, 0.28);
 }
 
 .field {
@@ -28,22 +27,24 @@
 .field input {
   padding: 13px 16px;
   border-radius: 14px;
-  border: 1px solid var(--glass-line);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
   color: var(--ink);
   font: 500 16px/1.3 var(--font-body);
   outline: none;
   transition: border-color 0.2s, background 0.2s;
 }
-.field input:focus-visible { border-color: var(--gold-2); background: rgba(255, 255, 255, 0.1); }
+.field input:focus-visible { border-color: var(--accent-strong); background: #fff; }
 
 .form-error {
   margin: -6px 0 14px;
   padding: 10px 12px;
   border-radius: 12px;
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  color: #fecaca;
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  /* --red itself is only 3.9–4.3:1 once composited on this wash (see tokens.css) — use the
+     darker text-only variant here. */
+  color: var(--red-strong);
   font-size: 14px;
 }
 .form-error[hidden] { display: none; }
@@ -76,13 +77,13 @@
   text-align: center;
   font: 700 22px/1 var(--font-display);
   border-radius: 12px;
-  border: 1px solid var(--glass-line);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
   color: var(--ink);
   outline: none;
   transition: border-color 0.2s, background 0.2s, transform 0.15s;
 }
-.otp-digit:focus-visible { border-color: var(--gold-2); background: rgba(255, 255, 255, 0.1); transform: translateY(-2px); }
+.otp-digit:focus-visible { border-color: var(--accent-strong); background: #fff; transform: translateY(-2px); }
 
 .join-back { display: inline-block; margin-top: 18px; color: var(--ink-mute); font-size: 14px; text-decoration: none; }
 .join-back:hover { color: var(--ink-soft); text-decoration: underline; }
@@ -127,10 +128,37 @@
   display: grid; place-items: center;
   border-radius: 50%;
   font-size: 18px;
-  background: color-mix(in srgb, var(--me-color, #8b5cf6) 55%, #1a0b3d);
+  background: color-mix(in srgb, var(--me-color, var(--accent)) 55%, var(--avatar-mix-base));
 }
 .room-me-name { font-weight: 600; font-size: 14px; }
 .room-me-role { display: block; font-size: 11px; color: var(--ink-mute); text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* ---------- accessibility helpers ---------- */
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- reconnect banner (B.4) ---------- */
+
+.reconnect-banner {
+  width: 100%;
+  max-width: 640px;
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: rgba(255, 201, 60, 0.22);
+  border: 1px solid var(--gold-2);
+  color: var(--ink);
+  text-align: center;
+  font: 600 14px/1.4 var(--font-body);
+}
+.reconnect-banner[hidden] { display: none; }
 
 /* ---------- status banner ---------- */
 
@@ -144,7 +172,7 @@
   text-align: center;
   font: 600 15px/1.4 var(--font-body);
 }
-.status-banner.spectator { background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.4); }
+.status-banner.spectator { background: rgba(31, 181, 166, 0.14); border-color: rgba(14, 122, 112, 0.4); color: var(--support-strong); }
 
 .countdown-pill {
   display: inline-flex;
@@ -153,10 +181,10 @@
   margin-left: 10px;
   padding: 3px 12px;
   border-radius: 999px;
-  background: rgba(245, 158, 11, 0.2);
-  border: 1px solid rgba(245, 158, 11, 0.5);
+  background: var(--gold-1);
+  border: 1px solid var(--gold-2);
   font: 700 14px/1 var(--font-display);
-  color: var(--gold-1);
+  color: var(--ink);
 }
 .countdown-pill[hidden] { display: none; }
 
@@ -189,11 +217,32 @@
   display: grid; place-items: center;
   border-radius: 50%;
   font-size: 13px;
-  background: color-mix(in srgb, var(--chip-color, #8b5cf6) 55%, #1a0b3d);
+  background: color-mix(in srgb, var(--chip-color, var(--accent)) 55%, var(--avatar-mix-base));
 }
-.player-chip-dot { width: 8px; height: 8px; border-radius: 50%; background: #64748b; }
-.player-chip.is-connected .player-chip-dot { background: #34d399; }
-.player-chip-spectator { color: var(--ink-mute); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+/* NF-5 (round-2 audit): presence was color-only (a filled dot with no shape/text difference).
+   Offline is now a hollow ring; online fills solid AND a sr-only text node (rendered by
+   room.js/admin's room.js next to this dot) states "Online"/"Away" for assistive tech. */
+.player-chip-dot {
+  width: 8px; height: 8px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: transparent;
+  border: 1.5px solid var(--ink-mute);
+}
+.player-chip.is-connected .player-chip-dot { background: var(--green); border-color: var(--green); }
+/* N2 (browser audit): plain inline text next to the player's name read as crowded/ambiguous
+   ("Cara WATCHING") — give it the same pill treatment as the host console's status chips. */
+.player-chip-spectator {
+  margin-left: 2px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(31, 181, 166, 0.14);
+  color: var(--support-strong);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
 
 /* ---------- board wrap / hands overlay ---------- */
 
@@ -223,16 +272,29 @@
   font-size: 30px;
   line-height: 1;
   transform: rotate(-8deg);
-  filter: drop-shadow(0 0 2px var(--hand-color, #fff)) drop-shadow(0 0 10px var(--hand-color, #fff));
+  /* Ink halo first so the glyph stays visible on cream even if --hand-color is a pale hue,
+     then the player-color glow on top (T-M5: the old #fff fallback was invisible on light).
+     NF-1 (round-2 audit): the glow used the RAW PLAYER_COLORS value directly — 7 of 12 fail
+     3:1 against cream (worst: lime 1.87:1, yellow 1.82:1). Mix toward ink first, same 45/55
+     formula as .hand-name below, so every one of the 12 colors clears 3:1 (measured
+     5.33–8.89:1 against cream/white) while staying visibly tinted per player. */
+  filter:
+    drop-shadow(0 0 2px var(--ink))
+    drop-shadow(0 0 3px color-mix(in srgb, var(--hand-color, var(--accent-strong)) 45%, var(--ink)))
+    drop-shadow(0 0 10px color-mix(in srgb, var(--hand-color, var(--accent-strong)) 45%, var(--ink)));
 }
 .hand-name {
   font: 600 11px/1 var(--font-body);
   padding: 2px 9px;
   border-radius: 999px;
-  background: var(--hand-color, #8b5cf6);
-  color: #fff;
+  /* Mix the player's raw color mostly toward ink so every hue in PLAYER_COLORS (server-owned,
+     not themeable here) stays readable with light text — same technique the avatar circles
+     already use, just weighted further toward ink for a text label (see round-1 UI/UX audit
+     T-M11: several raw player colors fail contrast with white/cream text on their own). */
+  background: color-mix(in srgb, var(--hand-color, var(--accent)) 45%, var(--ink));
+  color: var(--bg-0);
   white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 2px 6px rgba(43, 34, 51, 0.35);
 }
 
 /* ---------- lock ring + owner chip ----------
@@ -240,11 +302,23 @@
    ring is a drop-shadow filter on .box-inner instead (matches the pattern app.css already uses
    for egg's own focus ring at ~line 580), which works uniformly across all five display styles. */
 
+/* NF-1 (round-2 audit): these used the raw PLAYER_COLORS value straight from the server —
+   7 of 12 fail 3:1 against the cream board (green 2.16, amber 2.04, cyan 2.30, lime 1.87,
+   orange 2.66, teal 2.36, yellow 1.82). Mixed 45% player-color / 55% ink (the same formula
+   already proven on .hand-name, T-M11) instead: every one of the 12 now measures 5.33–8.89:1
+   against both cream and white — see repohub-fix2/contrast.js for the full per-color table. */
 .box.is-locked .box-inner {
-  filter: drop-shadow(0 0 3px var(--owner, #fff)) drop-shadow(0 0 14px var(--owner, #fff));
+  filter:
+    drop-shadow(0 0 2px var(--ink))
+    drop-shadow(0 0 3px color-mix(in srgb, var(--owner, var(--accent-strong)) 45%, var(--ink)))
+    drop-shadow(0 0 14px color-mix(in srgb, var(--owner, var(--accent-strong)) 45%, var(--ink)));
 }
 .box.is-mine .box-inner {
-  filter: drop-shadow(0 0 4px var(--owner, #fff)) drop-shadow(0 0 12px var(--owner, #fff)) drop-shadow(0 0 26px var(--owner, #fff));
+  filter:
+    drop-shadow(0 0 2px var(--ink))
+    drop-shadow(0 0 4px color-mix(in srgb, var(--owner, var(--accent-strong)) 45%, var(--ink)))
+    drop-shadow(0 0 12px color-mix(in srgb, var(--owner, var(--accent-strong)) 45%, var(--ink)))
+    drop-shadow(0 0 26px color-mix(in srgb, var(--owner, var(--accent-strong)) 45%, var(--ink)));
 }
 .box.is-locked .box-inner,
 .box.is-mine .box-inner { transition: transform 0.35s var(--ease-spring), filter 0.2s; }
@@ -260,15 +334,55 @@
   gap: 4px;
   padding: 3px 10px 3px 4px;
   border-radius: 999px;
-  background: rgba(20, 8, 48, 0.88);
-  border: 1px solid var(--owner, var(--glass-line));
+  background: var(--ink);
+  /* NF-8/N8 (round-2 audit): same raw-color-on-light issue as the lock ring above — mix
+     toward ink so the border reads against the dark chip too. */
+  border: 1px solid color-mix(in srgb, var(--owner, var(--glass-line)) 45%, var(--ink));
   font: 600 11px/1.3 var(--font-body);
   white-space: nowrap;
   pointer-events: none;
 }
 .owner-chip[hidden] { display: none; }
 .owner-avatar { font-size: 14px; }
-.owner-name { max-width: 84px; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
+.owner-name { max-width: 84px; overflow: hidden; text-overflow: ellipsis; color: var(--bg-0); }
+
+/* An engine without color-mix() support treats a declaration containing color-mix(...) as
+   invalid as a WHOLE at computed-value time (not just that function call) — so `background`
+   and `filter` above would drop to transparent / none, not just lose their tint. Redefine just
+   the functional (non-decorative) rules with var()-only values: the per-player tint is lost,
+   but the hand label stays legible, the glyph keeps its readability halo, and the lock/mine
+   rings and owner-chip border still render. */
+@supports not (color: color-mix(in srgb, red, blue)) {
+  .hand-glyph {
+    filter:
+      drop-shadow(0 0 2px var(--ink))
+      drop-shadow(0 0 3px var(--ink))
+      drop-shadow(0 0 10px var(--ink));
+  }
+  .hand-name {
+    background: var(--ink);
+  }
+  .box.is-locked .box-inner {
+    filter:
+      drop-shadow(0 0 2px var(--ink))
+      drop-shadow(0 0 3px var(--ink))
+      drop-shadow(0 0 14px var(--ink));
+  }
+  .box.is-mine .box-inner {
+    filter:
+      drop-shadow(0 0 2px var(--ink))
+      drop-shadow(0 0 4px var(--ink))
+      drop-shadow(0 0 12px var(--ink))
+      drop-shadow(0 0 26px var(--ink));
+  }
+  /* The base rule sets the `border` SHORTHAND (not just border-color) to a color-mix() value —
+     an invalid shorthand drops every longhand it covers, including border-style, to its
+     initial value (`none`). Redeclaring only border-color here would leave border-style: none
+     and border-width: medium, i.e. still no visible border. Redeclare the whole shorthand. */
+  .owner-chip {
+    border: 1px solid var(--ink);
+  }
+}
 
 /* First render of an already-revealed room (reconnect / late spectator): show boxes open
    without replaying the open transition. Scoped away from .box-glow so its ambient spin/glow-in
@@ -305,13 +419,13 @@
   border: 1px solid var(--glass-line);
   font-size: 14px;
 }
-.result-row.is-self { border-color: var(--gold-2); background: rgba(245, 158, 11, 0.12); }
+.result-row.is-self { border-color: var(--gold-2); background: rgba(255, 201, 60, 0.16); }
 .result-avatar {
   width: 28px; height: 28px;
   display: grid; place-items: center;
   border-radius: 50%;
   font-size: 15px;
-  background: color-mix(in srgb, var(--row-color, #8b5cf6) 55%, #1a0b3d);
+  background: color-mix(in srgb, var(--row-color, var(--accent)) 55%, var(--avatar-mix-base));
   flex-shrink: 0;
 }
 .result-emoji { font-size: 18px; }
@@ -327,15 +441,35 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(8, 2, 24, 0.92);
+  background: rgba(43, 34, 51, 0.45);
   backdrop-filter: blur(6px);
   text-align: center;
 }
 .takeover[hidden] { display: none; }
+/* T-C4: the message used to sit directly on the dim backdrop with tokenized (dark-on-light)
+   text — unreadable once the backdrop can no longer assume a dark page behind it. Give it a
+   proper light surface, matching .reveal-card. */
+.takeover-card {
+  width: min(360px, 100%);
+  padding: 32px 26px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 30px 70px -24px rgba(43, 34, 51, 0.35);
+}
 .takeover-emoji { font-size: 56px; margin-bottom: 10px; }
 .takeover h2 { margin: 0 0 8px; font: 700 26px/1.2 var(--font-display); }
 .takeover p { margin: 0 0 20px; color: var(--ink-soft); }
 .takeover a.btn-primary { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+
+@media (max-width: 380px) {
+  /* Mi4 (round-2 audit): 12vw alone renders ~43.2px at exactly 360px — just under the 44px
+     comfort target. Tightening the card's own side padding and the row gap (not the shared
+     .card class other pages use) leaves enough room for a 44px+ digit at this width. */
+  .join-card { padding: 30px 14px; }
+  .otp { gap: 4px; }
+  .otp-digit { width: clamp(44px, 14vw, 48px); }
+}
 
 @media (max-width: 480px) {
   .otp { gap: 6px; }

@@ -4,11 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Mystery Box — Room</title>
-  <meta name="theme-color" content="#1a0b3d" />
+  <meta name="theme-color" content="#FFF8EE" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎁</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/tokens.css" />
   <link rel="stylesheet" href="/css/app.css" />
   <link rel="stylesheet" href="/css/room.css" />
 </head>
@@ -36,10 +37,13 @@
       </div>
     </header>
 
+    <p id="reconnect-banner" class="reconnect-banner" role="status" hidden></p>
+
     <p id="status-banner" class="status-banner" aria-live="polite">
       <span id="status-text">Connecting…</span>
-      <span id="countdown-pill" class="countdown-pill" hidden></span>
+      <span id="countdown-pill" class="countdown-pill" aria-hidden="true" hidden></span>
     </p>
+    <p id="sr-announce" class="sr-only" aria-live="polite"></p>
 
     <ul id="player-list" class="player-list"></ul>
 
@@ -72,7 +76,7 @@
   </div>
 
   <div id="kicked-screen" class="takeover" hidden>
-    <div>
+    <div class="takeover-card" tabindex="-1">
       <div class="takeover-emoji" aria-hidden="true">🚪</div>
       <h2>You were removed</h2>
       <p>The host removed you from this room.</p>
@@ -81,7 +85,7 @@
   </div>
 
   <div id="closed-screen" class="takeover" hidden>
-    <div>
+    <div class="takeover-card" tabindex="-1">
       <div class="takeover-emoji" aria-hidden="true">🔒</div>
       <h2>This room has ended</h2>
       <p>Thanks for playing!</p>

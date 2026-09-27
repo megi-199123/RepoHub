@@ -339,8 +339,10 @@ function createApp({ db, databaseUrl, dataDir, adminPassword, countdownMsOverrid
       if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
       return `"${s.replace(/"/g, '""')}"`;
     };
-    const rows = [['Date', 'Claim code', 'Prize', 'Redeemed', 'Redeemed at', 'Player']];
-    for (const d of await store.listDraws()) rows.push([d.createdAt, d.code, d.prizeName, d.redeemed ? 'yes' : 'no', d.redeemedAt, d.playerName]);
+    const rows = [['Date', 'Claim code', 'Prize', 'Redeemed', 'Redeemed at', 'Player', 'Room']];
+    for (const d of await store.listDraws()) {
+      rows.push([d.createdAt, d.code, d.prizeName, d.redeemed ? 'yes' : 'no', d.redeemedAt, d.playerName, d.roomCode]);
+    }
     res.type('text/csv').attachment('mystery-box-draws.csv').send(rows.map((r) => r.map(esc).join(',')).join('\n'));
   });
 

@@ -5,10 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Backoffice · Mystery Box</title>
   <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#FFF8EE" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛠️</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/tokens.css" />
   <link rel="stylesheet" href="/admin/admin.css" />
 </head>
 <body>
@@ -22,7 +24,7 @@
         <span>Password</span>
         <input id="login-password" type="password" autocomplete="current-password" required autofocus />
       </label>
-      <p id="login-error" class="form-error" hidden></p>
+      <p id="login-error" class="form-error" role="alert" hidden></p>
       <button class="btn btn-primary btn-block" type="submit">Sign in</button>
       <a class="login-back" href="/">← Back to the game</a>
     </form>
@@ -144,7 +146,7 @@
             </label>
           </div>
 
-          <p id="settings-error" class="form-error" hidden></p>
+          <p id="settings-error" class="form-error" role="alert" hidden></p>
           <div class="form-actions">
             <button class="btn btn-primary" type="submit">Save settings</button>
           </div>
@@ -181,7 +183,7 @@
             <span>Countdown seconds <small class="muted">(optional — the host can also start one later)</small></span>
             <input name="countdownSeconds" type="number" min="5" max="120" step="1" placeholder="e.g. 15" />
           </label>
-          <p id="room-error" class="form-error" hidden></p>
+          <p id="room-error" class="form-error" role="alert" hidden></p>
           <div class="form-actions">
             <button class="btn btn-primary" type="submit">Create room</button>
           </div>
@@ -274,7 +276,7 @@
           <div class="image-row">
             <label class="btn btn-ghost file-btn">
               Upload image
-              <input id="image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+              <input id="image-file" class="file-input-visually-hidden" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
             </label>
             <input name="image" class="grow" placeholder="…or paste an image URL" />
             <button id="image-clear" class="btn btn-ghost" type="button">Remove</button>
@@ -314,7 +316,7 @@
           </label>
         </div>
 
-        <p id="prize-error" class="form-error" hidden></p>
+        <p id="prize-error" class="form-error" role="alert" hidden></p>
         <div class="form-actions">
           <button class="btn btn-ghost" type="button" data-close>Cancel</button>
           <button class="btn btn-primary" type="submit">Save prize</button>

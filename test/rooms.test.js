@@ -7,6 +7,8 @@ const { io: sioClient } = require('socket.io-client');
 const { createApp } = require('../server/app');
 const { openDatabase } = require('../server/db');
 const { Store } = require('../server/store');
+const { RoomService } = require('../server/rooms/service');
+const games = require('../server/games');
 
 const ADMIN_PASSWORD = 'hunter2';
 // Fire countdown timers fast in tests regardless of the requested seconds; the stored
@@ -18,6 +20,7 @@ let base;
 let db;
 let closeApp;
 let testStore;
+let ioMain;
 const openSockets = [];
 
 // Runs against an in-memory embedded Postgres by default.
@@ -32,7 +35,7 @@ before(async () => {
   await ready;
   testStore = new Store(db);
   server = http.createServer(app);
-  attach(server);
+  ioMain = attach(server);
   await new Promise((resolve) => { server.listen(0, resolve); });
   base = `http://127.0.0.1:${server.address().port}`;
 });
@@ -771,4 +774,168 @@ test('T25 host:action re-checks the admin session; a revoked one is downgraded, 
   // The socket's cached host role must be downgraded, not just this one call refused.
   const again = await emitAck(host, 'host:action', { type: 'close' });
   assert.equal(again.ok, false);
+});
+
+test('T26 unlock frees the box for another player; unlock outside picking is rejected', async () => {
+  const admin = await adminReq();
+  const room = await createRoom(admin, { boxCount: 2 });
+  const a = client('t26a');
+  const b = client('t26b');
+  await a('POST', '/api/rooms/join', { code: room.code, name: 'A26' });
+  await b('POST', '/api/rooms/join', { code: room.code, name: 'B26' });
+  const host = await connectSocket(admin.cookieHeader());
+  const sa = await connectSocket(a.cookieHeader());
+  const sb = await connectSocket(b.cookieHeader());
+  await emitAck(host, 'room:join', { code: room.code, as: 'host' });
+  await emitAck(sa, 'room:join', { code: room.code });
+  await emitAck(sb, 'room:join', { code: room.code });
+
+  // Still in the lobby: unlock has nothing to release and must fail, not silently succeed.
+  const tooEarly = await emitAck(sa, 'game:action', { type: 'unlock' });
+  assert.equal(tooEarly.ok, false);
+  assert.equal(tooEarly.error, 'Boxes are not open for picking right now');
+
+  await emitAck(host, 'host:action', { type: 'start' });
+  assert.equal((await emitAck(sa, 'game:action', { type: 'lock', box: 0 })).ok, true);
+
+  const freed = waitFor(host, 'room:state', (v) => v.players.every((p) => p.lockedBox === null));
+  assert.equal((await emitAck(sa, 'game:action', { type: 'unlock' })).ok, true);
+  await freed;
+
+  // Box 0 is free again: another player can now lock it.
+  assert.equal((await emitAck(sb, 'game:action', { type: 'lock', box: 0 })).ok, true);
+
+  // Once the countdown locks the room, unlock is rejected there too (not just pre-start).
+  const locked = waitFor(host, 'room:state', (v) => v.status === 'locked');
+  assert.equal((await emitAck(host, 'host:action', { type: 'countdown', seconds: 5 })).ok, true);
+  await locked;
+  const tooLate = await emitAck(sb, 'game:action', { type: 'unlock' });
+  assert.equal(tooLate.ok, false);
+  assert.equal(tooLate.error, 'Boxes are not open for picking right now');
+});
+
+test('T27 countdown re-arm: a past countdown_ends_at is applied immediately by a new instance', async () => {
+  const admin = await adminReq();
+  const room = await createRoom(admin, { boxCount: 2 });
+  const host = await connectSocket(admin.cookieHeader());
+  assert.equal((await emitAck(host, 'room:join', { code: room.code, as: 'host' })).ok, true);
+  assert.equal((await emitAck(host, 'host:action', { type: 'start' })).ok, true);
+
+  const dbRoom = await testStore.getRoomByCode(room.code);
+  assert.equal(dbRoom.status, 'picking');
+  // Backdate directly via SQL rather than the 'countdown' host action: going through the action
+  // would arm (and, thanks to COUNTDOWN_MS_OVERRIDE, immediately fire) a timer on THIS instance,
+  // which is exactly what this test must avoid — it's testing a *second* instance's re-arm.
+  await db.query("UPDATE rooms SET countdown_ends_at = now() - interval '5 seconds' WHERE id = $1", [dbRoom.id]);
+
+  const second = createApp({ db, adminPassword: ADMIN_PASSWORD });
+  await second.ready;
+  try {
+    let status;
+    for (let i = 0; i < 40; i++) {
+      status = (await testStore.getRoom(dbRoom.id)).status;
+      if (status === 'locked') break;
+      await new Promise((resolve) => { setTimeout(resolve, 25); });
+    }
+    assert.equal(status, 'locked', 'expected _rearmCountdowns to apply an already-past countdown immediately');
+  } finally {
+    await second.close();
+  }
+});
+
+test('T28 countdown re-arm: a still-pending countdown is re-armed by a new instance and fires', async () => {
+  const admin = await adminReq();
+  const room = await createRoom(admin, { boxCount: 2 });
+  const host = await connectSocket(admin.cookieHeader());
+  assert.equal((await emitAck(host, 'room:join', { code: room.code, as: 'host' })).ok, true);
+  assert.equal((await emitAck(host, 'host:action', { type: 'start' })).ok, true);
+
+  const dbRoom = await testStore.getRoomByCode(room.code);
+  // Genuinely in the future — not yet due — so this proves a re-arm, not just a past-deadline catch-up.
+  await db.query("UPDATE rooms SET countdown_ends_at = now() + interval '1 hour' WHERE id = $1", [dbRoom.id]);
+
+  // The override hook still applies across a restart: the stored countdown_ends_at keeps the real
+  // duration, but the re-armed timer fires fast like every other timer in this suite.
+  const second = createApp({ db, adminPassword: ADMIN_PASSWORD, countdownMsOverride: COUNTDOWN_MS_OVERRIDE });
+  await second.ready;
+  try {
+    let status;
+    for (let i = 0; i < 40; i++) {
+      status = (await testStore.getRoom(dbRoom.id)).status;
+      if (status === 'locked') break;
+      await new Promise((resolve) => { setTimeout(resolve, 25); });
+    }
+    assert.equal(status, 'locked', 'expected the re-armed countdown to fire via the override hook');
+  } finally {
+    await second.close();
+  }
+});
+
+test('T29 sweep closes stale rooms (by last_activity_at or finished_at) and notifies connected sockets; a fresh room is untouched', async () => {
+  const admin = await adminReq();
+
+  const roomA = await createRoom(admin, { boxCount: 2 }); // left stale in 'lobby'
+  const hostA = await connectSocket(admin.cookieHeader());
+  assert.equal((await emitAck(hostA, 'room:join', { code: roomA.code, as: 'host' })).ok, true);
+
+  const roomB = await createRoom(admin, { boxCount: 2 }); // driven to 'finished' with no locks, then aged
+  const hostB = await connectSocket(admin.cookieHeader());
+  assert.equal((await emitAck(hostB, 'room:join', { code: roomB.code, as: 'host' })).ok, true);
+  await emitAck(hostB, 'host:action', { type: 'start' });
+  const finishedState = waitFor(hostB, 'room:state', (v) => v.status === 'finished');
+  assert.equal((await emitAck(hostB, 'host:action', { type: 'reveal', mode: 'all' })).ok, true);
+  await finishedState;
+
+  const roomC = await createRoom(admin, { boxCount: 2 }); // fresh: must survive the sweep
+
+  const dbA = await testStore.getRoomByCode(roomA.code);
+  const dbB = await testStore.getRoomByCode(roomB.code);
+  const dbC = await testStore.getRoomByCode(roomC.code);
+  await db.query("UPDATE rooms SET last_activity_at = now() - interval '3 hours' WHERE id = $1", [dbA.id]);
+  await db.query("UPDATE rooms SET finished_at = now() - interval '31 minutes' WHERE id = $1", [dbB.id]);
+
+  // A second, throwaway RoomService pointed at the same store, wired to the SAME io as the main
+  // test server (so `io.to(room)` reaches the already-connected hostA/hostB sockets) — this lets
+  // the test invoke sweep() directly instead of waiting out the real 60s interval.
+  const sweepService = new RoomService({ store: testStore, games });
+  sweepService.setIo(ioMain);
+  try {
+    const closedA = waitFor(hostA, 'room:closed');
+    const closedB = waitFor(hostB, 'room:closed');
+    await sweepService.sweep();
+    await closedA;
+    await closedB;
+  } finally {
+    sweepService.shutdown();
+  }
+
+  assert.equal((await testStore.getRoom(dbA.id)).status, 'closed');
+  assert.equal((await testStore.getRoom(dbB.id)).status, 'closed');
+  assert.equal((await testStore.getRoom(dbC.id)).status, 'lobby', 'a fresh room must not be swept');
+});
+
+test('T30 CSV export includes a Room column with the room code for a room draw', async () => {
+  const admin = await adminReq();
+  const room = await createRoom(admin, { boxCount: 2 });
+  const a = client('t30a');
+  await a('POST', '/api/rooms/join', { code: room.code, name: 'A30' });
+  const host = await connectSocket(admin.cookieHeader());
+  const sa = await connectSocket(a.cookieHeader());
+  await emitAck(host, 'room:join', { code: room.code, as: 'host' });
+  await emitAck(sa, 'room:join', { code: room.code });
+  await emitAck(host, 'host:action', { type: 'start' });
+  await emitAck(sa, 'game:action', { type: 'lock', box: 0 });
+
+  const st = waitFor(host, 'room:state', (v) => v.status === 'finished');
+  assert.equal((await emitAck(host, 'host:action', { type: 'reveal', mode: 'all' })).ok, true);
+  await st;
+
+  const csv = await admin('GET', '/api/admin/draws.csv');
+  assert.equal(csv.status, 200);
+  assert.match(csv.body, /^"Date","Claim code","Prize","Redeemed","Redeemed at","Player","Room"/);
+
+  const lines = csv.body.trim().split('\n');
+  const roomRow = lines.find((l) => l.includes('"A30"'));
+  assert.ok(roomRow, 'expected a CSV row for the room draw');
+  assert.ok(roomRow.endsWith(`"${room.code}"`), `expected the row to end with the room code, got: ${roomRow}`);
 });

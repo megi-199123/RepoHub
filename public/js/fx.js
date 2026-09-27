@@ -15,6 +15,10 @@
 
   // ---------- starfield ----------
 
+  // "Carnival light" confetti-dot backdrop: small drifting dots in the brand palette,
+  // instead of the old dark-theme white starfield (invisible on a cream page).
+  const SPECK_COLORS = ['#ff6b5b', '#ffc93c', '#1fb5a6'];
+
   function startStars(canvas) {
     let ctx = fitCanvas(canvas);
     let stars = [];
@@ -27,6 +31,7 @@
         phase: Math.random() * Math.PI * 2,
         speed: Math.random() * 0.02 + 0.005,
         drift: Math.random() * 0.15 + 0.02,
+        color: SPECK_COLORS[Math.floor(Math.random() * SPECK_COLORS.length)],
       }));
     };
     seed();
@@ -38,9 +43,9 @@
         s.phase += s.speed;
         s.y -= s.drift;
         if (s.y < -2) { s.y = innerHeight + 2; s.x = Math.random() * innerWidth; }
-        const a = 0.35 + Math.sin(s.phase) * 0.35;
+        const a = 0.22 + Math.sin(s.phase) * 0.16;
         ctx.globalAlpha = Math.max(0, a);
-        ctx.fillStyle = '#fff';
+        ctx.fillStyle = s.color;
         ctx.beginPath();
         ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
         ctx.fill();
@@ -59,7 +64,7 @@
   let running = false;
   addEventListener('resize', () => { if (confettiCanvas) confettiCtx = fitCanvas(confettiCanvas); });
 
-  const PALETTE = ['#fde68a', '#f59e0b', '#f472b6', '#a78bfa', '#34d399', '#60a5fa', '#ffffff'];
+  const PALETTE = ['#ffc93c', '#e8a400', '#ff6b5b', '#c2321f', '#1fb5a6', '#0e7a70', '#2b2233'];
 
   function burst({ x = innerWidth / 2, y = innerHeight / 2, count = 160, colors = [], spread = 1 } = {}) {
     if (!confettiCtx) return;
