@@ -39,6 +39,7 @@
       <nav class="tabs" role="tablist">
         <button class="tab" role="tab" data-tab="prizes" aria-selected="true">Prizes</button>
         <button class="tab" role="tab" data-tab="settings" aria-selected="false">Settings</button>
+        <button class="tab" role="tab" data-tab="rooms" aria-selected="false">Rooms</button>
         <button class="tab" role="tab" data-tab="winners" aria-selected="false">Winners <span id="winners-count" class="tab-count">0</span></button>
       </nav>
       <div class="topbar-actions">
@@ -90,10 +91,22 @@
             </label>
           </div>
 
-          <div class="field">
-            <span>Number of boxes <output id="box-count-out" class="pill">4</output></span>
-            <input name="boxCount" type="range" min="2" max="12" step="1" />
-            <div class="range-scale"><span>2</span><span>12</span></div>
+          <div class="grid-2">
+            <div class="field">
+              <span>Number of boxes <output id="box-count-out" class="pill">4</output></span>
+              <input name="boxCount" type="range" min="2" max="12" step="1" />
+              <div class="range-scale"><span>2</span><span>12</span></div>
+            </div>
+            <label class="field">
+              <span>Box style</span>
+              <select name="boxStyle" class="select">
+                <option value="gift">🎁 Gift box</option>
+                <option value="card">🃏 Card</option>
+                <option value="suitcase">💼 Suitcase</option>
+                <option value="chest">🗝️ Treasure chest</option>
+                <option value="egg">🥚 Egg</option>
+              </select>
+            </label>
           </div>
 
           <fieldset class="field">
@@ -138,6 +151,56 @@
         </form>
       </section>
 
+      <!-- Rooms -->
+      <section class="panel" data-panel="rooms" hidden>
+        <div class="panel-head">
+          <div>
+            <h2>Rooms</h2>
+            <p class="muted">Create a multiplayer room and share the code — players join from their own phone or laptop at <strong>/join</strong>.</p>
+          </div>
+        </div>
+
+        <form id="room-form" class="card room-form">
+          <div class="grid-2">
+            <label class="field">
+              <span>Box style</span>
+              <select name="style" class="select">
+                <option value="gift">🎁 Gift box</option>
+                <option value="card">🃏 Card</option>
+                <option value="suitcase">💼 Suitcase</option>
+                <option value="chest">🗝️ Treasure chest</option>
+                <option value="egg">🥚 Egg</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Number of boxes</span>
+              <input name="boxCount" type="number" min="2" max="12" step="1" required />
+            </label>
+          </div>
+          <label class="field">
+            <span>Countdown seconds <small class="muted">(optional — the host can also start one later)</small></span>
+            <input name="countdownSeconds" type="number" min="5" max="120" step="1" placeholder="e.g. 15" />
+          </label>
+          <p id="room-error" class="form-error" hidden></p>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Create room</button>
+          </div>
+        </form>
+
+        <div id="room-created" class="card room-created" hidden>
+          <span class="muted">Room created — share this code:</span>
+          <strong id="room-created-code" class="room-created-code"></strong>
+          <button id="room-created-copy" class="btn btn-ghost" type="button">Copy invite</button>
+          <a id="room-created-open" class="btn btn-primary" href="#" target="_blank" rel="noopener">Open host console ↗</a>
+        </div>
+
+        <ul id="room-list" class="room-list"></ul>
+        <div id="room-empty" class="empty small" hidden>
+          <div class="empty-art">🚪</div>
+          <p class="muted">No active rooms. Create one above to get started.</p>
+        </div>
+      </section>
+
       <!-- Winners -->
       <section class="panel" data-panel="winners" hidden>
         <div class="panel-head">
@@ -155,7 +218,7 @@
 
         <div class="card table-card">
           <div class="table-tools">
-            <input id="draw-search" class="search" type="search" placeholder="Search claim code or prize…" />
+            <input id="draw-search" class="search" type="search" placeholder="Search claim code, prize or player…" />
             <select id="draw-filter" class="select">
               <option value="all">All plays</option>
               <option value="pending">Wins to redeem</option>
@@ -166,7 +229,7 @@
           <div class="table-wrap">
             <table class="table">
               <thead>
-                <tr><th>When</th><th>Prize</th><th>Claim code</th><th class="right">Redeemed</th></tr>
+                <tr><th>When</th><th>Player</th><th>Prize</th><th>Claim code</th><th class="right">Redeemed</th></tr>
               </thead>
               <tbody id="draw-rows"></tbody>
             </table>

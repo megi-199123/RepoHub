@@ -14,7 +14,7 @@
     down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
   };
 
-  const state = { prizes: [], odds: {}, settings: null, draws: [], editing: null };
+  const state = { prizes: [], odds: {}, settings: null, draws: [], editing: null, rooms: [] };
 
   // ---------- utils ----------
 
@@ -103,6 +103,7 @@
     for (const panel of $$('.panel')) panel.hidden = panel.dataset.panel !== name;
     if (name === 'winners') loadDraws();
     if (name === 'prizes') loadPrizes();
+    if (name === 'rooms') loadRooms();
     try { history.replaceState(null, '', `#${name}`); } catch { /* ignore */ }
   }
   for (const tab of $$('.tab')) tab.addEventListener('click', () => selectTab(tab.dataset.tab));
@@ -349,6 +350,7 @@
     settingsForm.subtitle.value = s.subtitle;
     settingsForm.boxCount.value = s.boxCount;
     $('#box-count-out').textContent = s.boxCount;
+    settingsForm.boxStyle.value = s.boxStyle || 'gift';
     for (const r of settingsForm.assignment) r.checked = r.value === s.assignment;
     settingsForm.showPrizes.checked = s.showPrizes;
     settingsForm.maxPlaysPerVisitor.value = s.maxPlaysPerVisitor;
@@ -368,6 +370,7 @@
           title: settingsForm.title.value,
           subtitle: settingsForm.subtitle.value,
           boxCount: Number(settingsForm.boxCount.value),
+          boxStyle: settingsForm.boxStyle.value,
           assignment: settingsForm.assignment.value,
           showPrizes: settingsForm.showPrizes.checked,
           maxPlaysPerVisitor: Number(settingsForm.maxPlaysPerVisitor.value || 0),
@@ -378,6 +381,115 @@
     } catch (err) {
       $('#settings-error').textContent = err.message;
       $('#settings-error').hidden = false;
+    }
+  });
+
+  // ---------- rooms ----------
+
+  const roomForm = $('#room-form');
+
+  function populateRoomDefaults() {
+    if (!state.settings) return;
+    roomForm.style.value = state.settings.boxStyle || 'gift';
+    roomForm.boxCount.value = state.settings.boxCount;
+  }
+
+  roomForm.addEventListener('input', () => { roomForm.dataset.touched = '1'; });
+
+  function inviteText(code) {
+    return `Join at ${location.origin}/join?code=${code} — code ${code}`;
+  }
+
+  async function copyInvite(code) {
+    try {
+      await navigator.clipboard.writeText(inviteText(code));
+      toast('Invite copied!');
+    } catch {
+      toast('Copy failed — please share the code manually.', 'error');
+    }
+  }
+
+  function showRoomCreated(room) {
+    const box = $('#room-created');
+    $('#room-created-code').textContent = room.code;
+    $('#room-created-open').href = `/admin/room?code=${encodeURIComponent(room.code)}`;
+    box.dataset.code = room.code;
+    box.hidden = false;
+  }
+
+  $('#room-created-copy').addEventListener('click', () => copyInvite($('#room-created').dataset.code));
+
+  roomForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    $('#room-error').hidden = true;
+    const body = {
+      style: roomForm.style.value,
+      boxCount: Number(roomForm.boxCount.value),
+    };
+    const seconds = roomForm.countdownSeconds.value.trim();
+    if (seconds !== '') body.countdownSeconds = Number(seconds);
+    const submit = $('button[type=submit]', roomForm);
+    submit.disabled = true;
+    try {
+      const room = await api('/api/admin/rooms', { method: 'POST', body: JSON.stringify(body) });
+      showRoomCreated(room);
+      toast(`Room ${room.code} created`);
+      await loadRooms();
+    } catch (err) {
+      $('#room-error').textContent = err.message;
+      $('#room-error').hidden = false;
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  function statusChipClass(status) {
+    if (status === 'lobby') return 'info';
+    if (status === 'finished' || status === 'closed') return 'off';
+    if (status === 'locked' || status === 'revealing') return 'warn';
+    return '';
+  }
+
+  async function loadRooms() {
+    if (!roomForm.dataset.touched) populateRoomDefaults();
+    state.rooms = await api('/api/admin/rooms');
+    renderRooms();
+  }
+
+  function renderRooms() {
+    const rooms = state.rooms;
+    $('#room-empty').hidden = rooms.length > 0;
+    $('#room-list').innerHTML = rooms.map((r) => {
+      const created = new Date(r.createdAt);
+      return `
+        <li class="room-row" data-code="${esc(r.code)}">
+          <div class="room-row-main">
+            <strong class="room-row-code">${esc(r.code)}</strong>
+            <span class="chip ${statusChipClass(r.status)}">${esc(r.status)}</span>
+          </div>
+          <div class="room-row-meta muted">
+            ${r.playerCount} player${r.playerCount === 1 ? '' : 's'} · ${r.spectatorCount} spectator${r.spectatorCount === 1 ? '' : 's'} · ${created.toLocaleDateString()} ${created.toLocaleTimeString()}
+          </div>
+          <div class="room-row-actions">
+            <a class="btn btn-ghost" href="/admin/room?code=${encodeURIComponent(r.code)}" target="_blank" rel="noopener">Open</a>
+            <button class="btn btn-danger-ghost" data-act="close" type="button">Close</button>
+          </div>
+        </li>`;
+    }).join('');
+  }
+
+  $('#room-list').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-act="close"]');
+    if (!btn) return;
+    const code = btn.closest('.room-row').dataset.code;
+    const ok = await confirmDialog({ title: `Close room ${code}?`, text: 'Everyone in this room will be disconnected. This cannot be undone.', ok: 'Close room' });
+    if (!ok) return;
+    try {
+      await api(`/api/admin/rooms/${code}`, { method: 'DELETE' });
+      toast(`Room ${code} closed`);
+      await loadRooms();
+    } catch (err) {
+      toast(err.message, 'error');
     }
   });
 
@@ -406,16 +518,20 @@
       if (filter === 'pending' && (!d.code || d.redeemed)) return false;
       if (filter === 'redeemed' && !d.redeemed) return false;
       if (filter === 'nowin' && d.code) return false;
-      return !q || (d.code || '').toLowerCase().includes(q) || d.prizeName.toLowerCase().includes(q);
+      return !q || (d.code || '').toLowerCase().includes(q) || d.prizeName.toLowerCase().includes(q) || (d.playerName || '').toLowerCase().includes(q);
     });
 
     $('#draw-empty').hidden = rows.length > 0;
     $('#draw-empty p').textContent = draws.length ? 'Nothing matches your search.' : 'No plays yet.';
     $('#draw-rows').innerHTML = rows.map((d) => {
       const date = new Date(d.createdAt);
+      const playerCell = d.playerName
+        ? `${esc(d.playerName)}${d.roomId ? ' <span class="chip info">Room</span>' : ''}`
+        : '<span class="muted">—</span>';
       return `
         <tr data-id="${esc(d.id)}">
           <td class="when">${date.toLocaleDateString()}<small>${date.toLocaleTimeString()}</small></td>
+          <td>${playerCell}</td>
           <td><span class="cell-prize"><span class="cell-emoji">${esc(d.emoji)}</span>${esc(d.prizeName)}</span></td>
           <td>${d.code ? `<span class="code">${esc(d.code)}</span>` : '<span class="muted">— no win —</span>'}</td>
           <td class="right">${d.code ? `<input type="checkbox" class="switch" ${d.redeemed ? 'checked' : ''} aria-label="Redeemed" />` : ''}</td>
@@ -459,6 +575,6 @@
     if (!authenticated) return showLogin();
     await showDash();
     const tab = location.hash.slice(1);
-    if (['prizes', 'settings', 'winners'].includes(tab)) selectTab(tab);
+    if (['prizes', 'settings', 'rooms', 'winners'].includes(tab)) selectTab(tab);
   })().catch((err) => toast(err.message, 'error'));
 })();

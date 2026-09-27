@@ -1,6 +1,7 @@
 'use strict';
 
 const path = require('path');
+const http = require('http');
 const { createApp } = require('./app');
 
 const port = Number(process.env.PORT) || 3000;
@@ -14,11 +15,14 @@ if (!process.env.DATABASE_URL) {
   console.log(`ℹ️  DATABASE_URL is not set — using the embedded local database in ${dataDir}`);
 }
 
-const { app, ready } = createApp({ databaseUrl: process.env.DATABASE_URL, dataDir, adminPassword });
+const { app, ready, attach } = createApp({ databaseUrl: process.env.DATABASE_URL, dataDir, adminPassword });
+
+const server = http.createServer(app);
+attach(server);
 
 ready
   .then(() => {
-    app.listen(port, () => {
+    server.listen(port, () => {
       console.log(`🎁 Mystery Box running at http://localhost:${port}`);
       console.log(`🛠  Backoffice at        http://localhost:${port}/admin`);
     });

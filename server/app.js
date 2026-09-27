@@ -6,64 +6,26 @@ const express = require('express');
 const { Store, newId } = require('./store');
 const { openDatabase } = require('./db');
 const { fillBoxes, estimateOdds, isAvailable, weightedPick } = require('./draw');
+const { STYLES } = require('./rooms/constants');
+const { attachRealtime } = require('./realtime');
+const { RoomService } = require('./rooms/service');
+const games = require('./games');
+const { HttpError } = require('./httpError');
+const { str, int } = require('./validate');
+const { parseCookies } = require('./cookies');
+const { claimCode } = require('./codes');
+const { publicPrize } = require('./prizeView');
+const { clientIp } = require('./ratelimit');
 
 const ROUND_TTL_MS = 30 * 60 * 1000;
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
 const IMAGE_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' };
 
-class HttpError extends Error {
-  constructor(status, message) {
-    super(message);
-    this.status = status;
-  }
-}
-
-function parseCookies(header = '') {
-  const out = {};
-  for (const part of header.split(';')) {
-    const i = part.indexOf('=');
-    if (i > 0) out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
-  }
-  return out;
-}
-
 function safeEqual(a, b) {
   const ha = crypto.createHash('sha256').update(String(a)).digest();
   const hb = crypto.createHash('sha256').update(String(b)).digest();
   return crypto.timingSafeEqual(ha, hb);
-}
-
-/** Human-friendly claim code without ambiguous characters (no 0/O, 1/I). */
-function claimCode() {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const bytes = crypto.randomBytes(8);
-  let code = '';
-  for (let i = 0; i < 8; i++) code += alphabet[bytes[i] % alphabet.length];
-  return `MB-${code.slice(0, 4)}-${code.slice(4)}`;
-}
-
-function publicPrize(p) {
-  return { id: p.id, name: p.name, description: p.description, emoji: p.emoji, image: p.image, color: p.color, winning: p.winning };
-}
-
-// ---------- validation ----------
-
-function str(value, field, { max = 200, required = false } = {}) {
-  if (value === undefined || value === null) value = '';
-  if (typeof value !== 'string') throw new HttpError(400, `${field} must be text`);
-  value = value.trim();
-  if (required && !value) throw new HttpError(400, `${field} is required`);
-  if (value.length > max) throw new HttpError(400, `${field} is too long (max ${max})`);
-  return value;
-}
-
-function int(value, field, min, max) {
-  const n = Number(value);
-  if (!Number.isInteger(n) || n < min || n > max) {
-    throw new HttpError(400, `${field} must be a whole number between ${min} and ${max}`);
-  }
-  return n;
 }
 
 function validatePrize(body, existing = {}) {
@@ -94,6 +56,9 @@ function validateSettings(body, current) {
   if (!['unique', 'weighted'].includes(merged.assignment)) {
     throw new HttpError(400, 'Assignment must be "unique" or "weighted"');
   }
+  if (!STYLES.includes(merged.boxStyle)) {
+    throw new HttpError(400, `Box style must be one of: ${STYLES.join(', ')}`);
+  }
   return {
     title: str(merged.title, 'Title', { max: 60, required: true }),
     subtitle: str(merged.subtitle, 'Subtitle', { max: 160 }),
@@ -101,6 +66,7 @@ function validateSettings(body, current) {
     assignment: merged.assignment,
     showPrizes: Boolean(merged.showPrizes),
     maxPlaysPerVisitor: int(merged.maxPlaysPerVisitor ?? 0, 'Plays per visitor', 0, 1000),
+    boxStyle: merged.boxStyle,
   };
 }
 
@@ -112,8 +78,11 @@ function validateSettings(body, current) {
  *
  * Options: `db` (an already-open handle, used by tests) or `databaseUrl` / `dataDir`.
  */
-function createApp({ db, databaseUrl, dataDir, adminPassword }) {
+function createApp({ db, databaseUrl, dataDir, adminPassword, countdownMsOverride }) {
   let store;
+  let roomService;
+  let io = null;
+  let pendingIo = null; // attach() may run before roomService exists (server/index.js calls it before `ready`)
   let connecting = null;
   // Connect once; if it fails (e.g. the database is briefly unreachable), the next request retries.
   const connect = () => {
@@ -121,6 +90,9 @@ function createApp({ db, databaseUrl, dataDir, adminPassword }) {
       const s = new Store(db || (await openDatabase({ databaseUrl, dataDir })));
       await s.migrate();
       store = s;
+      roomService = new RoomService({ store: s, games, countdownMsOverride });
+      await roomService.ready;
+      if (pendingIo) roomService.setIo(pendingIo);
       return s;
     })().catch((err) => {
       connecting = null;
@@ -142,6 +114,9 @@ function createApp({ db, databaseUrl, dataDir, adminPassword }) {
   };
 
   app.use('/api', express.json({ limit: '4mb' }));
+
+  // A liveness probe that never touches the database, so it stays fast even if the DB is down.
+  app.get('/healthz', (req, res) => res.json({ ok: true }));
 
   // Wait for the database before touching any dynamic route.
   const needsDb = async (req, res, next) => {
@@ -175,10 +150,21 @@ function createApp({ db, databaseUrl, dataDir, adminPassword }) {
       title: s.title,
       subtitle: s.subtitle,
       boxCount: s.boxCount,
+      boxStyle: s.boxStyle,
       showPrizes: s.showPrizes,
       playsLeft: await playsLeft(s, req.visitor),
       prizes: s.showPrizes ? prizes.filter(isAvailable).map(publicPrize) : [],
     });
+  });
+
+  app.post('/api/rooms/join', async (req, res) => {
+    const result = await roomService.join({
+      code: req.body?.code,
+      name: req.body?.name,
+      visitor: req.visitor,
+      ip: clientIp(req),
+    });
+    res.json(result);
   });
 
   app.post('/api/rounds', async (req, res) => {
@@ -304,6 +290,19 @@ function createApp({ db, databaseUrl, dataDir, adminPassword }) {
     res.json(estimateOdds(prizes, s.boxCount, s.assignment));
   });
 
+  // ----- admin: rooms -----
+
+  app.post('/api/admin/rooms', async (req, res) => {
+    res.status(201).json(await roomService.createRoom(req.body ?? {}));
+  });
+
+  app.get('/api/admin/rooms', async (req, res) => res.json(await roomService.listRooms()));
+
+  app.delete('/api/admin/rooms/:code', async (req, res) => {
+    await roomService.closeRoomByCode(req.params.code);
+    res.status(204).end();
+  });
+
   // ----- admin: uploads (stored in the database, so no file storage is needed) -----
 
   app.post('/api/admin/uploads', async (req, res) => {
@@ -332,9 +331,16 @@ function createApp({ db, databaseUrl, dataDir, adminPassword }) {
   });
 
   app.get('/api/admin/draws.csv', async (req, res) => {
-    const esc = (v) => `"${String(v instanceof Date ? v.toISOString() : v ?? '').replace(/"/g, '""')}"`;
-    const rows = [['Date', 'Claim code', 'Prize', 'Redeemed', 'Redeemed at']];
-    for (const d of await store.listDraws()) rows.push([d.createdAt, d.code, d.prizeName, d.redeemed ? 'yes' : 'no', d.redeemedAt]);
+    // Neutralize spreadsheet formula injection: a cell that opens with =, +, -, @, a tab or a CR
+    // (e.g. a prize name or player display name someone crafted as `=cmd(...)`) gets a leading `'`
+    // so Excel/Sheets shows it as literal text instead of evaluating it as a formula.
+    const esc = (v) => {
+      let s = String(v instanceof Date ? v.toISOString() : v ?? '');
+      if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+      return `"${s.replace(/"/g, '""')}"`;
+    };
+    const rows = [['Date', 'Claim code', 'Prize', 'Redeemed', 'Redeemed at', 'Player']];
+    for (const d of await store.listDraws()) rows.push([d.createdAt, d.code, d.prizeName, d.redeemed ? 'yes' : 'no', d.redeemedAt, d.playerName]);
     res.type('text/csv').attachment('mystery-box-draws.csv').send(rows.map((r) => r.map(esc).join(',')).join('\n'));
   });
 
@@ -347,8 +353,12 @@ function createApp({ db, databaseUrl, dataDir, adminPassword }) {
     res.set('Cache-Control', 'public, max-age=31536000, immutable').type(image.mime).send(image.data);
   });
 
+  app.get('/admin/room', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'admin', 'room.html')));
+
   app.use(express.static(path.join(__dirname, '..', 'public')));
   app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'admin', 'index.html')));
+  app.get('/join', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'join.html')));
+  app.get('/room', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'room.html')));
 
   app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 
@@ -360,7 +370,29 @@ function createApp({ db, databaseUrl, dataDir, adminPassword }) {
     res.status(status).json({ error: expected ? err.message : 'Something went wrong' });
   });
 
-  return { app, ready };
+  /** Wire up Socket.IO on the http.Server that serves this app: the room join/leave, cursor relay, and game protocol. */
+  function attach(httpServer) {
+    ({ io } = attachRealtime(httpServer, { store: () => store, roomService: () => roomService }));
+    if (roomService) roomService.setIo(io);
+    else pendingIo = io;
+    return io;
+  }
+
+  /**
+   * Shut down anything `attach`/`connect` started. `io.close()` also closes the http.Server it
+   * was bound to, so the test harness's own `server.close()` afterwards would hit
+   * ERR_SERVER_NOT_RUNNING — callers should tolerate that. Safe to call even if `attach` was
+   * never called, or if the database never finished connecting.
+   */
+  function close() {
+    return new Promise((resolve) => {
+      roomService?.shutdown();
+      if (!io) return resolve();
+      io.close(() => resolve());
+    });
+  }
+
+  return { app, ready, attach, close };
 }
 
 module.exports = { createApp };

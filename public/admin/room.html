@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Host Console — Mystery Box</title>
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#1a0b3d" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/app.css" />
+  <link rel="stylesheet" href="/css/room.css" />
+  <link rel="stylesheet" href="/admin/admin.css" />
+</head>
+<body>
+  <canvas id="stars" aria-hidden="true"></canvas>
+  <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+
+  <main class="host-app">
+    <header class="host-header">
+      <a class="host-back" href="/admin#rooms">← Rooms</a>
+      <div class="host-code-block">
+        <span class="host-code-label">Room code</span>
+        <strong id="host-code" class="host-code">------</strong>
+      </div>
+      <button id="copy-invite" class="btn btn-ghost" type="button">Copy invite</button>
+    </header>
+
+    <p id="status-banner" class="status-banner host-status" aria-live="polite">
+      <span id="status-text">Connecting…</span>
+      <span id="countdown-pill" class="countdown-pill" hidden></span>
+    </p>
+    <p id="lock-summary" class="host-lock-summary" hidden></p>
+
+    <div class="host-layout">
+      <section class="host-board">
+        <div class="stage">
+          <div id="boxes" class="boxes" role="group" aria-label="Mystery boxes"></div>
+        </div>
+        <ul id="results-list" class="results-list" hidden></ul>
+      </section>
+
+      <aside class="host-panel card">
+        <div class="host-panel-section">
+          <h2>Players</h2>
+          <ul id="player-list" class="host-player-list"></ul>
+          <p id="player-empty" class="muted small" hidden>No one has joined yet.</p>
+        </div>
+
+        <div class="host-panel-section">
+          <h2>Controls</h2>
+          <label class="switch-row host-switch-row">
+            <input id="lock-joins" type="checkbox" class="switch" />
+            <span>
+              <strong>Lock joins</strong>
+              <span class="muted">Stop new players from joining.</span>
+            </span>
+          </label>
+
+          <div class="host-actions">
+            <button id="btn-start" class="btn btn-primary btn-block" type="button">Start picking</button>
+
+            <div class="host-countdown-row">
+              <input id="countdown-seconds" type="number" min="5" max="120" step="1" value="15" aria-label="Countdown seconds" />
+              <button id="btn-countdown" class="btn btn-primary" type="button">Start countdown</button>
+            </div>
+
+            <div class="host-reveal-row">
+              <button id="btn-reveal-next" class="btn btn-ghost" type="button">Reveal next</button>
+              <button id="btn-reveal-all" class="btn btn-ghost" type="button">Reveal all</button>
+            </div>
+
+            <button id="btn-close" class="btn btn-danger-ghost btn-block" type="button">Close room</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <div id="ended-screen" class="takeover" hidden>
+    <div>
+      <div class="takeover-emoji" aria-hidden="true">🔒</div>
+      <h2>Room closed</h2>
+      <p>This room has ended.</p>
+      <a class="btn-primary small" href="/admin#rooms"><span>Back to Rooms</span></a>
+    </div>
+  </div>
+
+  <dialog id="confirm-dialog" class="dialog dialog-sm">
+    <form method="dialog" class="confirm">
+      <h2 id="confirm-title">Are you sure?</h2>
+      <p id="confirm-text" class="muted"></p>
+      <div class="form-actions">
+        <button class="btn btn-ghost" value="cancel">Cancel</button>
+        <button class="btn btn-danger" value="ok" id="confirm-ok">Confirm</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <canvas id="confetti" aria-hidden="true"></canvas>
+
+  <script src="/socket.io/socket.io.min.js"></script>
+  <script src="/js/fx.js"></script>
+  <script src="/js/boxes.js"></script>
+  <script src="/js/board.js"></script>
+  <script src="/admin/room.js"></script>
+</body>
+</html>

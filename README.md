@@ -54,6 +54,27 @@ Everything, including uploaded prize images, is stored in Postgres, so no separa
 
 A prize leaves the draw once its stock hits 0. When no prize is available, players see a friendly "all prizes claimed" message.
 
+## Multiplayer rooms
+
+Jackbox-style: the host runs one shared board on a big screen; each player joins from their own phone with a room code and picks their own box.
+
+**Hosting a room**: Backoffice → **Rooms** tab → **Create room** (pick a box count, style and optional countdown). This opens a host console at `/admin/room?code=123456` with:
+
+- **Lock joins** — stop new players from joining mid-game
+- **Start** — deals the boxes and moves everyone from the lobby into picking
+- **Countdown** — arms a timer that locks all boxes when it hits zero
+- **Reveal next** / **Reveal all** — opens boxes one at a time or all at once
+- **Kick** — removes a player; if a seat opens up in the lobby, the earliest spectator is promoted
+- **Close** — ends the room immediately for everyone
+
+**Joining**: players go to `/join`, enter the 6-digit code and their name, and land on `/room?code=123456`. Room codes are numeric with leading zeros kept (e.g. `007123`), unique among active (non-closed) rooms, and rate-limited (10 failed join attempts per IP per 5 minutes, then a 429). A room closes on its own if left idle: 2 hours in the lobby or mid-game, 30 minutes after it finishes.
+
+**Seats and spectators**: a room has as many seats as boxes. Once every seat is taken, later joiners watch as spectators — they see the shared board and cursors but can't pick. A room plays one round; to play again the host creates a new room.
+
+**Reveal and stock**: only locked (claimed) boxes take prize stock and get a claim code when revealed; boxes nobody picked are opened for show with no draw recorded. Reconnecting (same browser, same room) restores your seat and any box you'd already locked. Room wins never count against a visitor's solo plays-per-visitor limit — that's a separate budget from the `/` game.
+
+Rooms reuse the same 5 box styles as solo play (gift, card, suitcase, chest, egg), chosen per room at creation.
+
 ## Project layout
 
 ```
@@ -63,16 +84,23 @@ server/
   draw.js     box filling, weighted picks, odds estimation
   db.js       Postgres (pg) or embedded PGlite connection
   store.js    schema, migrations and all SQL queries
+  realtime.js Socket.IO wiring: room:join, cursor relay, game:action, host:action
+  rooms/      RoomService (room/player bookkeeping), room codes, constants
+  games/      game plugins (mysteryBox) — dealing, locking, revealing, per-viewer views
+  httpError.js, validate.js, cookies.js, codes.js, prizeView.js, ratelimit.js   shared helpers
 public/
-  index.html, css/app.css, js/app.js, js/fx.js   the game
-  admin/                                         the backoffice
-api/index.js  Vercel serverless entry point
+  index.html, css/app.css, js/app.js, js/fx.js, js/boxes.js   the solo game
+  join.html, room.html, js/join.js, js/room.js, js/board.js, css/room.css   player room pages
+  admin/                                         the backoffice, Rooms tab and host console (room.html/room.js)
+api/index.js  Vercel serverless entry point (solo mode only)
 vercel.json   Vercel routing
 test/
-  api.test.js
+  api.test.js, rooms.test.js
 ```
 
 ## Deploying
+
+Rooms need a long-running Node process (WebSockets for Socket.IO), so they only work on a host that runs `npm start` continuously, such as Railway. Vercel's `api/index.js` is a serverless function with no persistent socket connection, so a Vercel deployment serves solo play (`/`) only — the Rooms tab, `/join` and `/room` won't work there until it's moved to a long-running host.
 
 ### Vercel + Railway Postgres
 

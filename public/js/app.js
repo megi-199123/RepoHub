@@ -27,17 +27,6 @@
     sound: $('sound-toggle'),
   };
 
-  const BOX_COLORS = [
-    ['#a78bfa', '#6d28d9'],
-    ['#f472b6', '#be185d'],
-    ['#38bdf8', '#0369a1'],
-    ['#34d399', '#047857'],
-    ['#fb923c', '#c2410c'],
-    ['#f87171', '#b91c1c'],
-    ['#818cf8', '#4338ca'],
-    ['#2dd4bf', '#0f766e'],
-  ];
-
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
   let config = null;
@@ -126,26 +115,7 @@
   }
 
   function createBox(i) {
-    const [c1, c2] = BOX_COLORS[i % BOX_COLORS.length];
-    const box = document.createElement('button');
-    box.type = 'button';
-    box.className = 'box';
-    box.style.setProperty('--i', i);
-    box.style.setProperty('--c1', c1);
-    box.style.setProperty('--c2', c2);
-    box.innerHTML = `
-      <div class="box-inner">
-        <div class="box-shadow"></div>
-        <div class="box-glow"></div>
-        <div class="box-body"></div>
-        <div class="box-prize"></div>
-        <div class="box-lid"><div class="bow"><span class="bow-knot"></span></div></div>
-        <span class="box-number"></span>
-      </div>
-      <span class="box-label"></span>`;
-    box.addEventListener('animationend', (e) => {
-      if (e.animationName === 'box-in') box.style.animation = 'none';
-    });
+    const box = window.Boxes.createBox(i, (config && config.boxStyle) || 'gift');
     box.addEventListener('click', () => pick(box));
     return box;
   }
@@ -174,7 +144,16 @@
     const sizeFor = (cols) => (width - (cols - 1) * gap) / cols;
     let cols = preferred;
     while (cols > 2 && sizeFor(cols) < 118) cols--;
-    const size = Math.max(96, Math.min(190, sizeFor(cols)));
+    let size = Math.max(96, Math.min(190, sizeFor(cols)));
+
+    // Styles taller than gift (e.g. card) would otherwise make the whole grid
+    // ~1.4x taller at the same width; shrink --box-size so rendered height stays
+    // comparable to gift's. Styles no taller than gift (e.g. suitcase) are left
+    // as-is — factor caps at 1, so gift itself is always the unchanged 1x path.
+    const style = (config && config.boxStyle) || 'gift';
+    const factor = Math.min(1, window.Boxes.aspect(style) / window.Boxes.aspect('gift'));
+    size *= factor;
+
     els.boxes.style.setProperty('--cols', cols);
     els.boxes.style.setProperty('--box-size', `${Math.floor(size)}px`);
   }
@@ -379,6 +358,8 @@
   async function refreshConfig() {
     try {
       config = await api('/api/config');
+      window.Boxes.setStyle(els.boxes, config.boxStyle);
+      layout();
       renderLineup(config.prizes);
       renderPlaysLeft(config.playsLeft);
       if (config.playsLeft === 0) {
@@ -425,6 +406,7 @@
     document.title = config.title;
     els.title.textContent = config.title;
     els.subtitle.textContent = config.subtitle;
+    window.Boxes.setStyle(els.boxes, config.boxStyle);
     renderLineup(config.prizes);
     renderPlaysLeft(config.playsLeft);
     renderBoxes(config.boxCount);

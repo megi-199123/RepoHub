@@ -436,6 +436,102 @@ input[type='range'] { width: 100%; accent-color: var(--accent-2); height: 24px; 
 .toast.out { opacity: 0; transform: translateY(8px); transition: 0.25s; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(16px) scale(0.95); } }
 
+/* ---------- rooms tab ---------- */
+
+.room-form { padding: 20px 24px; max-width: 640px; margin-bottom: 20px; }
+
+.room-created {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+.room-created-code { font: 700 30px/1 var(--font-display); letter-spacing: 0.06em; color: var(--gold); }
+
+.room-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.room-row {
+  display: flex;
+  align-items: center;
+  gap: 10px 18px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.room-row-main { display: flex; align-items: center; gap: 10px; }
+.room-row-code { font: 700 20px/1 var(--font-display); letter-spacing: 0.05em; }
+.room-row-meta { flex: 1; min-width: 220px; font-size: 13px; }
+.room-row-actions { display: flex; gap: 8px; }
+
+/* ---------- host room console ---------- */
+
+.host-app {
+  position: relative;
+  z-index: 1;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: clamp(16px, 4vh, 28px) 16px 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.host-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.host-back { color: var(--ink-mute); text-decoration: none; font-size: 14px; white-space: nowrap; }
+.host-back:hover { color: var(--ink-soft); text-decoration: underline; }
+.host-code-block { text-align: center; }
+.host-code-label { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-mute); }
+.host-code { font: 700 34px/1.15 var(--font-display); letter-spacing: 0.06em; }
+
+.host-status { max-width: 640px; margin: 0 auto; }
+.host-lock-summary { margin: 0; text-align: center; color: var(--ink-soft); font-weight: 600; }
+.host-lock-summary[hidden] { display: none; }
+
+.host-layout { display: flex; flex-direction: column; gap: 20px; }
+.host-board { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+
+.host-panel { padding: 20px; display: flex; flex-direction: column; gap: 24px; }
+.host-panel-section h2 { font-size: 16px; margin-bottom: 10px; }
+.host-switch-row { padding: 0 0 4px; }
+
+.host-player-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; }
+.host-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.host-player-avatar {
+  width: 26px; height: 26px; flex: none;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  font-size: 13px;
+  background: color-mix(in srgb, var(--chip-color, #8b5cf6) 55%, #1a0b3d);
+}
+.host-player-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: #64748b; }
+.host-player.is-connected .host-player-dot { background: var(--green); }
+.host-player-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.host-kick { flex: none; }
+.chip.ok { background: rgba(52, 211, 153, 0.16); color: var(--green); }
+
+.host-actions { display: flex; flex-direction: column; gap: 10px; }
+.host-countdown-row { display: flex; gap: 8px; }
+.host-countdown-row input[type='number'] { width: 84px; flex: none; }
+.host-countdown-row .btn { flex: 1; }
+.host-reveal-row { display: flex; gap: 8px; }
+.host-reveal-row .btn { flex: 1; }
+
+@media (min-width: 900px) {
+  .host-layout { flex-direction: row; align-items: flex-start; }
+  .host-board { flex: 1; min-width: 0; }
+  .host-panel { width: 340px; flex: none; position: sticky; top: 20px; }
+}
+
 /* ---------- responsive ---------- */
 
 @media (max-width: 860px) {

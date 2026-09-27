@@ -401,6 +401,186 @@ button { font: inherit; color: inherit; }
 .box.is-other .box-inner { transform: scale(0.92); }
 .box.is-dim { opacity: 0.45; filter: grayscale(0.4); transition: opacity 0.4s, filter 0.4s; }
 
+/* ---------- display style: card ---------- */
+/* A face-down playing card that flips over to show the prize. */
+
+.boxes[data-style="card"] .box { aspect-ratio: 0.7; }
+
+.boxes[data-style="card"] .box-body {
+  left: 4%; right: 4%; top: 3%; bottom: 3%; height: auto;
+  border-radius: 14px;
+  background: linear-gradient(165deg, #fdf7ff, #ede2ff 55%, #ded0ff);
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 255, 255, 0.65),
+    inset 0 10px 18px rgba(255, 255, 255, 0.25),
+    0 18px 40px -14px color-mix(in srgb, var(--c2) 80%, black);
+}
+
+.boxes[data-style="card"] .box-lid {
+  left: 4%; right: 4%; top: 3%; bottom: 3%; height: auto;
+  border-radius: 14px;
+  background:
+    repeating-linear-gradient(45deg, transparent 0 10px, rgba(255, 255, 255, 0.12) 10px 12px),
+    linear-gradient(165deg, var(--c1), var(--c2));
+  box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.85), 0 10px 24px -10px rgba(0, 0, 0, 0.5);
+  transform-origin: 50% 50%;
+  backface-visibility: hidden;
+}
+.card-emblem {
+  position: absolute; inset: 0; margin: auto;
+  width: 42%; aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.15) 70%, transparent 74%);
+  mix-blend-mode: overlay;
+}
+.card-corner { position: absolute; width: 15%; aspect-ratio: 1; border: 2px solid rgba(255, 255, 255, 0.85); border-radius: 5px; }
+.card-corner-tl { top: 8%; left: 8%; }
+.card-corner-br { bottom: 8%; right: 8%; }
+
+.boxes[data-style="card"] .box-body::before,
+.boxes[data-style="card"] .box-body::after { content: none; }
+
+.boxes[data-style="card"] .box.is-open .box-lid { animation: card-flip 0.7s cubic-bezier(.45, 0, .55, 1) forwards; }
+.boxes[data-style="card"] .box.is-open .box-prize { transform: translate(-50%, -46%) scale(1); }
+@keyframes card-flip {
+  0% { transform: perspective(600px) rotateY(0deg); opacity: 1; }
+  55% { transform: perspective(600px) rotateY(96deg); opacity: 1; }
+  100% { transform: perspective(600px) rotateY(180deg); opacity: 0; }
+}
+
+/* ---------- display style: suitcase ---------- */
+/* A hinged case lid that swings up and back to reveal the compartment. */
+
+.boxes[data-style="suitcase"] .box { aspect-ratio: 1.25; }
+
+.boxes[data-style="suitcase"] .box-body {
+  left: 4%; right: 4%; top: 40%; bottom: 0; height: auto;
+  border-radius: 8px 8px 14px 14px;
+  background: linear-gradient(160deg, var(--c1), var(--c2));
+  box-shadow:
+    inset 0 -14px 24px rgba(0, 0, 0, 0.25),
+    inset 0 10px 18px rgba(255, 255, 255, 0.12),
+    0 18px 40px -12px color-mix(in srgb, var(--c2) 80%, black);
+}
+
+.boxes[data-style="suitcase"] .box-lid {
+  left: 4%; right: 4%; top: 4%; height: 40%; bottom: auto;
+  border-radius: 14px 14px 8px 8px;
+  background: linear-gradient(170deg, color-mix(in srgb, var(--c1) 80%, white), var(--c1) 60%, var(--c2));
+  box-shadow: 0 8px 14px -6px rgba(0, 0, 0, 0.5), inset 0 3px 6px rgba(255, 255, 255, 0.3);
+  transform-origin: 50% 0%;
+  backface-visibility: hidden;
+}
+.suitcase-handle {
+  position: absolute; left: 50%; top: -14%;
+  width: 34%; height: 30%;
+  transform: translateX(-50%);
+  border: clamp(4px, 1vw, 7px) solid var(--gold-2);
+  border-bottom: 0;
+  border-radius: 14px 14px 0 0;
+}
+.suitcase-latch {
+  position: absolute; bottom: -8%;
+  width: 13%; height: 16%;
+  border-radius: 4px;
+  background: linear-gradient(180deg, var(--gold-1), var(--gold-3));
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.35);
+}
+.suitcase-latch-a { left: 16%; }
+.suitcase-latch-b { right: 16%; }
+
+.boxes[data-style="suitcase"] .box.is-open .box-lid { animation: suitcase-open 0.8s var(--ease-spring) forwards; }
+@keyframes suitcase-open {
+  0% { transform: perspective(600px) rotateX(0deg); opacity: 1; }
+  60% { opacity: 1; }
+  100% { transform: perspective(600px) rotateX(-118deg); opacity: 0; }
+}
+
+/* ---------- display style: chest ---------- */
+/* A domed treasure-chest lid that hinges back at the top. */
+
+.boxes[data-style="chest"] .box-body {
+  left: 6%; right: 6%; top: 34%; bottom: 0; height: auto;
+  border-radius: 6px 6px 14px 14px;
+  background: linear-gradient(160deg, var(--c1), var(--c2));
+  box-shadow:
+    inset 0 -14px 24px rgba(0, 0, 0, 0.25),
+    inset 0 10px 18px rgba(255, 255, 255, 0.12),
+    0 18px 40px -12px color-mix(in srgb, var(--c2) 80%, black);
+}
+
+.boxes[data-style="chest"] .box-lid {
+  left: 6%; right: 6%; top: 4%; height: 34%; bottom: auto;
+  border-radius: 50% 50% 6px 6px / 100% 100% 6px 6px;
+  background: linear-gradient(170deg, color-mix(in srgb, var(--c1) 85%, white), var(--c1) 55%, var(--c2));
+  box-shadow: 0 8px 14px -6px rgba(0, 0, 0, 0.5), inset 0 3px 6px rgba(255, 255, 255, 0.3);
+  transform-origin: 50% 0%;
+  backface-visibility: hidden;
+}
+.chest-band {
+  position: absolute; top: 0; bottom: 0;
+  width: 12%;
+  background: linear-gradient(180deg, var(--gold-1), var(--gold-3));
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+.chest-band-a { left: 20%; }
+.chest-band-b { right: 20%; }
+.chest-lock {
+  position: absolute; left: 50%; bottom: -12%;
+  width: 20%; aspect-ratio: 1;
+  transform: translateX(-50%);
+  border-radius: 6px;
+  background: radial-gradient(circle at 35% 30%, var(--gold-1), var(--gold-3) 70%);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+}
+
+.boxes[data-style="chest"] .box.is-open .box-lid { animation: chest-open 0.8s var(--ease-spring) forwards; }
+@keyframes chest-open {
+  0% { transform: perspective(600px) rotateX(0deg); opacity: 1; }
+  60% { opacity: 1; }
+  100% { transform: perspective(600px) rotateX(-132deg); opacity: 0; }
+}
+
+/* ---------- display style: egg ---------- */
+/* A cracked egg shell: the top half lifts and tilts away, the bottom stays put. */
+
+.boxes[data-style="egg"] .box-body {
+  left: 6%; right: 6%; top: 46%; bottom: 0; height: auto;
+  border-radius: 0 0 46% 46% / 0 0 26% 26%;
+  clip-path: polygon(
+    0% 8%, 10% 0%, 20% 9%, 30% 2%, 40% 9%, 50% 1%, 60% 9%, 70% 2%, 80% 9%, 90% 0%, 100% 8%,
+    100% 100%, 0% 100%
+  );
+  background: linear-gradient(180deg, var(--c1), var(--c2));
+  box-shadow: inset 0 -14px 24px rgba(0, 0, 0, 0.25), 0 18px 40px -12px color-mix(in srgb, var(--c2) 80%, black);
+}
+
+.boxes[data-style="egg"] .box-lid {
+  left: 6%; right: 6%; top: 4%; height: 46%; bottom: auto;
+  border-radius: 50% 50% 20% 20% / 60% 60% 15% 15%;
+  clip-path: polygon(
+    0% 0%, 100% 0%, 100% 92%, 90% 100%, 80% 91%, 70% 99%, 60% 92%, 50% 100%, 40% 92%, 30% 99%, 20% 91%, 10% 100%, 0% 92%
+  );
+  background: linear-gradient(160deg, color-mix(in srgb, var(--c1) 80%, white), var(--c1) 60%, var(--c2));
+  box-shadow: 0 8px 14px -6px rgba(0, 0, 0, 0.5), inset 0 3px 6px rgba(255, 255, 255, 0.3);
+  transform-origin: 50% 0%;
+}
+
+.boxes[data-style="egg"] .box.is-open .box-lid { animation: egg-crack 0.8s var(--ease-spring) forwards; }
+@keyframes egg-crack {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  60% { opacity: 1; }
+  100% { transform: translate(-16%, -130%) rotate(-32deg); opacity: 0; }
+}
+
+/* Deviation: the egg's clip-path removes the box-body focus ring (clip-path clips
+   box-shadow), so give keyboard focus a visible outline via the parent instead.
+   Scoped to [data-state='picking'] to match the generic rule at line ~367 above,
+   which only shows a focus ring while boxes are actually pickable. */
+.boxes[data-style="egg"][data-state='picking'] .box:focus-visible .box-inner {
+  filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 10px var(--c1));
+}
+
 /* ---------- controls ---------- */
 
 .controls { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 18px; }
@@ -563,6 +743,9 @@ button { font: inherit; color: inherit; }
 /* ---------- motion preferences ---------- */
 
 @media (prefers-reduced-motion: reduce) {
+  /* Covers every animation, including the per-style open keyframes
+     (card-flip, suitcase-open, chest-open, egg-crack) — they still run
+     (so `animationend`/`forwards` fill still resolve) but effectively instantly. */
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.15s !important; }
   .aurora { display: none; }
 }

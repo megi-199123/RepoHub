@@ -2,6 +2,7 @@
 
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
+const http = require('node:http');
 const { createApp } = require('../server/app');
 const { openDatabase } = require('../server/db');
 const { Store } = require('../server/store');
@@ -10,22 +11,28 @@ const { fillBoxes } = require('../server/draw');
 let server;
 let base;
 let db;
+let closeApp;
 
 // Runs against an in-memory embedded Postgres by default.
 // Set TEST_DATABASE_URL to run against a real (throwaway!) Postgres database.
 before(async () => {
   db = await openDatabase({ databaseUrl: process.env.TEST_DATABASE_URL, memory: true });
   if (process.env.TEST_DATABASE_URL) {
-    await db.query('DROP TABLE IF EXISTS settings, prizes, draws, rounds, admin_sessions, images');
+    await db.query('DROP TABLE IF EXISTS room_boxes, room_players, rooms, settings, prizes, draws, rounds, admin_sessions, images');
   }
-  const { app, ready } = createApp({ db, adminPassword: 'hunter2' });
+  const { app, ready, attach, close } = createApp({ db, adminPassword: 'hunter2' });
+  closeApp = close;
   await ready;
-  await new Promise((resolve) => { server = app.listen(0, resolve); });
+  server = http.createServer(app);
+  attach(server);
+  await new Promise((resolve) => { server.listen(0, resolve); });
   base = `http://127.0.0.1:${server.address().port}`;
 });
 
 after(async () => {
-  server.close();
+  await closeApp();
+  // Tolerant of ERR_SERVER_NOT_RUNNING: closeApp()/io.close() above already closed this server.
+  await new Promise((resolve) => server.close(() => resolve()));
   await db.close();
 });
 

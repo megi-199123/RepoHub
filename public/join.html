@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Join a room</title>
+  <meta name="theme-color" content="#1a0b3d" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎁</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/app.css" />
+  <link rel="stylesheet" href="/css/room.css" />
+</head>
+<body>
+  <canvas id="stars" aria-hidden="true"></canvas>
+  <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+
+  <main class="join-page">
+    <form id="join-form" class="card join-card" novalidate>
+      <div class="join-logo" aria-hidden="true">🎁</div>
+      <h1>Join a room</h1>
+      <p class="muted">Enter the 6-digit room code from the host's screen.</p>
+
+      <div class="otp" id="otp" role="group" aria-label="Room code">
+        <input class="otp-digit" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" aria-label="Digit 1" data-i="0" />
+        <input class="otp-digit" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" aria-label="Digit 2" data-i="1" />
+        <input class="otp-digit" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" aria-label="Digit 3" data-i="2" />
+        <input class="otp-digit" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" aria-label="Digit 4" data-i="3" />
+        <input class="otp-digit" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" aria-label="Digit 5" data-i="4" />
+        <input class="otp-digit" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" aria-label="Digit 6" data-i="5" />
+      </div>
+
+      <label class="field">
+        <span>Your name</span>
+        <input id="join-name" type="text" maxlength="20" required autocomplete="off" placeholder="e.g. Alex" />
+      </label>
+
+      <p id="join-error" class="form-error" hidden></p>
+
+      <button id="join-btn" class="btn-primary btn-block" type="submit">
+        <span class="btn-shine" aria-hidden="true"></span>
+        <span id="join-btn-label">Join room</span>
+      </button>
+
+      <a class="join-back" href="/">← Back to the game</a>
+    </form>
+  </main>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <script src="/js/fx.js"></script>
+  <script src="/js/join.js"></script>
+</body>
+</html>
