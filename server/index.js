@@ -7,6 +7,7 @@ const { createApp } = require('./app');
 const port = Number(process.env.PORT) || 3000;
 const dataDir = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const adminPassword = process.env.ADMIN_PASSWORD || 'admin';
+const adminEmail = process.env.ADMIN_EMAIL || undefined;
 
 if (!process.env.ADMIN_PASSWORD) {
   console.warn('⚠️  ADMIN_PASSWORD is not set — using the default password "admin". Set it before going live.');
@@ -15,7 +16,7 @@ if (!process.env.DATABASE_URL) {
   console.log(`ℹ️  DATABASE_URL is not set — using the embedded local database in ${dataDir}`);
 }
 
-const { app, ready, attach } = createApp({ databaseUrl: process.env.DATABASE_URL, dataDir, adminPassword });
+const { app, ready, attach } = createApp({ databaseUrl: process.env.DATABASE_URL, dataDir, adminPassword, adminEmail });
 
 const server = http.createServer(app);
 attach(server);

@@ -126,6 +126,7 @@ button, input, select { font: inherit; color: inherit; }
 .brand-logo { font-size: 24px; }
 .brand-name { font: 700 18px/1 var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
 .brand-tag { padding: 3px 8px; border-radius: 6px; background: rgba(255, 107, 91, 0.14); color: var(--accent-strong); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.user-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
 
 .tabs {
   display: flex; flex-wrap: wrap; gap: 4px;
@@ -199,6 +200,10 @@ button, input, select { font: inherit; color: inherit; }
   overflow: hidden;
 }
 .prize-art img { width: 100%; height: 100%; object-fit: cover; }
+/* B1: transparent PNGs/logos — no rounded tile, no gradient fill, no shadow, and the image is
+   never cropped (contain, not cover). Emoji prizes never get this class. */
+.prize-art.no-border { border-radius: 0; background: none; box-shadow: none; }
+.prize-art.no-border img { object-fit: contain; }
 .prize-main { min-width: 0; }
 .prize-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .prize-title strong { font-size: 16px; }
@@ -299,6 +304,9 @@ input[type='range'] { width: 100%; accent-color: var(--accent-strong); height: 2
 .switch:checked { background: var(--green-strong); border-color: transparent; }
 .switch:checked::after { transform: translateX(16px); }
 .switch:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
+.switch:disabled { opacity: 0.45; cursor: not-allowed; }
+.switch-row:has(.switch:disabled) { cursor: not-allowed; }
+.switch-row:has(.switch:disabled) > span { opacity: 0.55; }
 
 .check { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; color: var(--ink-soft); cursor: pointer; }
 .check input { accent-color: var(--accent-strong); width: 16px; height: 16px; }
@@ -327,10 +335,14 @@ input[type='range'] { width: 100%; accent-color: var(--accent-strong); height: 2
   background-repeat: no-repeat;
   background-position: 0 0, 0 100%, 0 0, 0 100%;
   background-size: 100% 40px, 100% 40px, 100% 12px, 100% 12px;
+  /* The layers above only cover 40px/12px strips at each edge; without a solid base colour
+     (the `background` shorthand resets it) the rest of the dialog was see-through. */
+  background-color: var(--bg-2);
 }
 .dialog[open] { animation: rise 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .dialog::backdrop { background: rgba(43, 34, 51, 0.45); backdrop-filter: blur(4px); }
 .dialog-sm { width: min(420px, calc(100% - 24px)); }
+.dialog-md { width: min(640px, calc(100% - 24px)); }
 .dialog-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
 .icon-close { width: 34px; height: 34px; border: 0; border-radius: 10px; background: rgba(43, 34, 51, 0.05); cursor: pointer; }
 .icon-close:hover { background: rgba(43, 34, 51, 0.1); }
@@ -380,6 +392,8 @@ input[type='range'] { width: 100%; accent-color: var(--accent-strong); height: 2
   overflow: hidden;
 }
 .preview-art img { width: 100%; height: 100%; object-fit: cover; }
+.preview-art.no-border { border-radius: 0; background: none; box-shadow: none; }
+.preview-art.no-border img { object-fit: contain; }
 .preview-name { position: relative; font: 700 24px/1.15 var(--font-display); word-break: break-word; }
 .preview-desc { position: relative; color: var(--ink-soft); }
 
@@ -494,19 +508,47 @@ input[type='range'] { width: 100%; accent-color: var(--accent-strong); height: 2
 
 .room-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .room-row {
-  display: flex;
-  align-items: center;
-  gap: 10px 18px;
-  flex-wrap: wrap;
-  padding: 14px 18px;
   border-radius: var(--radius);
   background: var(--surface);
   border: 1px solid var(--line);
+  transition: border-color 0.15s;
 }
-.room-row-main { display: flex; align-items: center; gap: 10px; }
-.room-row-code { font: 700 20px/1 var(--font-display); letter-spacing: 0.05em; }
-.room-row-meta { flex: 1; min-width: 220px; font-size: 13px; }
-.room-row-actions { display: flex; gap: 8px; }
+.room-row:hover { border-color: var(--line-strong); }
+.room-row.is-closed { opacity: 0.7; }
+.room-row-open {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 14px 18px;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.room-row-open:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: -2px; }
+.room-row-main { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.room-row-code { font: 700 18px/1 var(--font-display); letter-spacing: 0.05em; }
+.room-row-title { font-weight: 600; }
+.room-row-meta { font-size: 13px; }
+
+.chip.type-managed { background: rgba(255, 107, 91, 0.14); color: var(--accent-strong); }
+.chip.type-default { background: rgba(31, 181, 166, 0.14); color: var(--support-strong); }
+
+/* ---------- room detail ---------- */
+
+.rd-back { margin-bottom: 10px; }
+.rd-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rd-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.rd-fieldset:disabled { opacity: 0.55; }
+.rd-section { margin-top: 32px; }
+.rd-play-link { font: 600 14px/1.4 ui-monospace, 'SF Mono', Menlo, Consolas, monospace; word-break: break-all; color: var(--gold); }
+
+.rd-links-card { display: flex; flex-direction: column; gap: 12px; padding: 16px 20px; margin-bottom: 20px; }
+.rd-link-item { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 
 /* ---------- host room console ---------- */
 
@@ -527,17 +569,49 @@ input[type='range'] { width: 100%; accent-color: var(--accent-strong); height: 2
 .host-code-block { text-align: center; }
 .host-code-label { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-mute); }
 .host-code { font: 700 34px/1.15 var(--font-display); letter-spacing: 0.06em; }
+.host-title { display: block; margin-top: 2px; color: var(--ink-soft); font-size: 13px; }
+.host-title:empty { display: none; }
 
 .host-status { max-width: 640px; margin: 0 auto; }
 .host-lock-summary { margin: 0; text-align: center; color: var(--ink-soft); font-weight: 600; }
 .host-lock-summary[hidden] { display: none; }
 
+/* ---------- addendum A2: player / watch links (readable on the big screen) ---------- */
+
+.host-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 14px 18px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.host-link-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.host-link-label { flex: none; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-mute); width: 84px; }
+.host-link-url {
+  flex: 1;
+  min-width: 0;
+  font: 600 15px/1.4 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  color: var(--gold);
+  word-break: break-all;
+}
+
 .host-layout { display: flex; flex-direction: column; gap: 20px; }
 .host-board { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 
 .host-panel { padding: 20px; display: flex; flex-direction: column; gap: 24px; }
-.host-panel-section h2 { font-size: 16px; margin-bottom: 10px; }
+.host-panel-section h2 { font-size: 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
 .host-switch-row { padding: 0 0 4px; }
+.host-watching-count { font-size: 12px; font-weight: 600; color: var(--ink-mute); text-transform: none; letter-spacing: normal; }
+.host-watching-count[hidden] { display: none; }
+
+/* Addendum B2: the chat core (public/js/chat.js, variant "embedded") mounts here — see
+   room.css's ".chat-embedded" rules for its own sizing/scroll, this just resets the mount
+   div itself to a plain block so it doesn't fight the panel's flex layout. */
+.host-chat-mount { display: block; min-width: 0; }
 
 .host-player-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; }
 .host-player {
@@ -578,6 +652,24 @@ input[type='range'] { width: 100%; accent-color: var(--accent-strong); height: 2
 }
 .chip.ok { background: rgba(4, 120, 87, 0.14); color: var(--green-strong); }
 
+/* ---------- addendum A1: box-count stepper ---------- */
+
+.host-boxcount-row { display: flex; align-items: center; gap: 10px; padding: 4px 0 14px; }
+.host-boxcount-label { flex: 1; font-weight: 600; color: var(--ink-soft); }
+.host-boxcount-btn {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  font: 700 20px/1 var(--font-body);
+}
+.host-boxcount-value {
+  flex: none;
+  min-width: 32px;
+  text-align: center;
+  font: 700 20px/1 var(--font-display);
+}
+
 .host-actions { display: flex; flex-direction: column; gap: 10px; }
 .host-countdown-row { display: flex; gap: 8px; align-items: stretch; }
 .host-countdown-row input[type='number'] { width: 84px; flex: none; text-align: center; }
@@ -607,6 +699,7 @@ input[type='range'] { width: 100%; accent-color: var(--accent-strong); height: 2
 }
 @media (max-width: 520px) {
   .brand-tag, .topbar-actions .btn-ghost[href] { display: none; }
+  .user-name { display: none; }
   .table-tools { flex-direction: column; }
   .select { width: 100% !important; }
 
@@ -636,6 +729,7 @@ input[type='range'] { width: 100%; accent-color: var(--accent-strong); height: 2
   .switch { margin: 10px 0; }
   .prize-actions .switch { margin: 0 8px 0 0; }
   .host-kick.icon-btn { width: 44px; height: 44px; }
+  .host-boxcount-btn { width: 44px; height: 44px; }
   /* The switch stays visually 40×24 (its track shape is part of the design language) but its
      hit-testable area grows to ~44px in both dimensions via an invisible ::before, for the
      bare `<input class="switch">` instances that aren't already wrapped in a full-row label

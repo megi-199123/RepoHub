@@ -11,7 +11,11 @@
   const els = {
     stars: $('stars'),
     hostCode: $('host-code'),
-    copyInvite: $('copy-invite'),
+    hostTitle: $('host-title'),
+    playerLink: $('host-player-link'),
+    watchLink: $('host-watch-link'),
+    copyPlayerLink: $('copy-player-link'),
+    copyWatchLink: $('copy-watch-link'),
     reconnectBanner: $('reconnect-banner'),
     statusText: $('status-text'),
     countdownPill: $('countdown-pill'),
@@ -21,7 +25,13 @@
     resultsList: $('results-list'),
     playerList: $('player-list'),
     playerEmpty: $('player-empty'),
+    watchingCount: $('watching-count'),
     lockJoins: $('lock-joins'),
+    chatToggle: $('chat-toggle'),
+    chatMount: $('host-chat-mount'),
+    btnBoxcountMinus: $('btn-boxcount-minus'),
+    boxcountValue: $('boxcount-value'),
+    btnBoxcountPlus: $('btn-boxcount-plus'),
     btnStart: $('btn-start'),
     countdownSeconds: $('countdown-seconds'),
     btnCountdown: $('btn-countdown'),
@@ -54,6 +64,10 @@
     return;
   }
   els.hostCode.textContent = code;
+  // Addendum A2: two separate links, same room code — a player seats into the game, a watcher
+  // (POST /api/rooms/watch, then /watch's room.js) only ever gets a view-only board.
+  els.playerLink.textContent = `${location.origin}/?code=${code}`;
+  els.watchLink.textContent = `${location.origin}/watch?code=${code}`;
 
   let latestView = null;
   let ended = false;
@@ -118,6 +132,28 @@
 
   const socket = io({ transports: ['websocket', 'polling'] });
 
+  // Addendum B2: this console has exactly one viewer role, `host` — every host-authored message
+  // is "mine" here (there is only ever one owner). Delete uses a per-message pending key so
+  // deleting one message never disables another's 🗑 button.
+  const chat = window.Chat.create({
+    variant: 'embedded',
+    mountEl: els.chatMount,
+    allowDelete: true,
+    getRole: () => 'host',
+    isMine: (m) => m.authorRole === 'host',
+    onSend: (text) => new Promise((resolve) => {
+      socket.emit('chat:send', { text }, (res) => resolve(res || { ok: false, error: 'Something went wrong. Please try again.' }));
+    }),
+    onReact: (emoji) => socket.emit('chat:react', { emoji }),
+    onDelete: (id) => hostAction(`chatDelete:${id}`, { type: 'chatDelete', messageId: id }),
+    sound: window.FX.sound,
+    reducedMotion: window.FX.reducedMotion,
+  });
+  socket.on('chat:history', (list) => chat.history(list));
+  socket.on('chat:message', (msg) => chat.message(msg));
+  socket.on('chat:deleted', ({ id }) => chat.deleted(id));
+  socket.on('chat:reaction', (msg) => chat.reaction(msg));
+
   const board = window.Board.create(els.boxes, {
     interactive: false,
     showHands: true,
@@ -152,6 +188,7 @@
     ended = true;
     if (els.confirmDialog.open) els.confirmDialog.close();
     socket.disconnect();
+    chat.destroy();
     els.endedScreen.hidden = false;
     const card = els.endedScreen.querySelector('.takeover-card');
     if (card) card.focus();
@@ -192,13 +229,16 @@
     renderHeader(view);
     renderStatus(view);
     renderPlayers(view);
+    renderWatchingCount(view);
     renderResults(view);
     renderControls(view);
+    chat.applyRoomState({ chatEnabled: view.chatEnabled });
   }
 
   function renderHeader(view) {
-    document.title = `Host — Room ${view.code}`;
+    document.title = view.title ? `Host — ${view.title}` : `Host — Room ${view.code}`;
     els.hostCode.textContent = view.code;
+    els.hostTitle.textContent = view.title || '';
   }
 
   let lastStatusText = null;
@@ -212,6 +252,8 @@
     }
   }
 
+  // Addendum A2: `view.players` now lists only seated (role `player`, not kicked) entries —
+  // watchers are reported separately via `spectatorCount` (see renderWatchingCount).
   function renderPlayers(view) {
     els.playerEmpty.hidden = view.players.length > 0;
     els.playerList.replaceChildren(
@@ -229,7 +271,6 @@
           <span class="host-player-dot" aria-hidden="true"></span>
           <span class="sr-only">${p.connected ? 'Online' : 'Away'}</span>
           <span class="host-player-name" title="${esc(p.name)}">${esc(p.name)}</span>
-          ${p.role === 'spectator' ? '<span class="chip info">watching</span>' : ''}
           ${locked ? '<span class="chip ok">locked</span>' : ''}
           <button class="icon-btn danger host-kick${kicking ? ' is-kicking' : ''}" type="button" data-id="${esc(p.id)}" data-name="${esc(p.name)}" title="${kicking ? 'Kicking…' : `Kick ${esc(p.name)}`}" aria-label="${kicking ? `Kicking ${esc(p.name)}…` : `Kick ${esc(p.name)}`}"${kicking ? ' disabled' : ''}>${kicking ? 'Kicking…' : '✕'}</button>
         `;
@@ -237,14 +278,19 @@
       }),
     );
 
-    const seated = view.players.filter((p) => p.role === 'player');
-    if (['picking', 'locked', 'revealing'].includes(view.status) && seated.length > 0) {
-      const lockedCount = seated.filter((p) => p.lockedBox !== null && p.lockedBox !== undefined).length;
-      els.lockSummary.textContent = `${lockedCount} of ${seated.length} locked in`;
+    if (['picking', 'locked', 'revealing'].includes(view.status) && view.players.length > 0) {
+      const lockedCount = view.players.filter((p) => p.lockedBox !== null && p.lockedBox !== undefined).length;
+      els.lockSummary.textContent = `${lockedCount} of ${view.players.length} locked in`;
       els.lockSummary.hidden = false;
     } else {
       els.lockSummary.hidden = true;
     }
+  }
+
+  function renderWatchingCount(view) {
+    const n = view.spectatorCount || 0;
+    els.watchingCount.hidden = n === 0;
+    els.watchingCount.textContent = n === 0 ? '' : `👀 ${n} watching`;
   }
 
   els.playerList.addEventListener('click', async (e) => {
@@ -283,7 +329,7 @@
 
   /** What the current room status alone allows (ignores connection/pending gates below). */
   function computeAllowed(view) {
-    if (!view) return { start: false, countdown: false, reveal: false, close: false, lockJoins: false };
+    if (!view) return { start: false, countdown: false, reveal: false, close: false, lockJoins: false, boxCount: false, chatToggle: false };
     const status = view.status;
     return {
       start: status === 'lobby',
@@ -291,6 +337,11 @@
       reveal: ['picking', 'locked', 'revealing'].includes(status),
       close: status !== 'closed',
       lockJoins: status !== 'finished' && status !== 'closed',
+      // Addendum A1: box count can change up to and including `picking` — locked/revealing/
+      // finished/closed → the server 409s ("Boxes are already locked in").
+      boxCount: status === 'lobby' || status === 'picking',
+      // Addendum B2: chatEnabled has no lobby-only restriction — any non-closed status.
+      chatToggle: status !== 'closed',
     };
   }
 
@@ -309,6 +360,9 @@
     // between the click and its ack used to snap the checkbox back and then forward again.
     if (latestView && !pending.has('lockJoins')) els.lockJoins.checked = Boolean(latestView.joinLocked);
 
+    els.chatToggle.disabled = gate || pending.has('chatEnabled') || !allowed.chatToggle;
+    if (latestView && !pending.has('chatEnabled')) els.chatToggle.checked = Boolean(latestView.chatEnabled);
+
     els.btnStart.disabled = gate || pending.has('start') || !allowed.start;
 
     els.btnCountdown.disabled = gate || pending.has('countdown') || !allowed.countdown;
@@ -318,6 +372,12 @@
     els.btnRevealAll.disabled = gate || pending.has('reveal') || !allowed.reveal;
 
     els.btnClose.disabled = gate || pending.has('close') || !allowed.close;
+
+    const boxCountBusy = pending.has('boxCount');
+    const boxCount = latestView ? latestView.boxCount : null;
+    els.btnBoxcountMinus.disabled = gate || boxCountBusy || !allowed.boxCount || boxCount === null || boxCount <= 2;
+    els.btnBoxcountPlus.disabled = gate || boxCountBusy || !allowed.boxCount || boxCount === null || boxCount >= 12;
+    if (boxCount !== null && !boxCountBusy) els.boxcountValue.textContent = boxCount;
   }
 
   function renderControls() {
@@ -331,6 +391,26 @@
       // hostAction has already shown the toast; this just undoes the optimistic flip.
       if (err || (res && res.ok === false)) els.lockJoins.checked = !locked;
     });
+  });
+
+  els.chatToggle.addEventListener('change', () => {
+    const enabled = els.chatToggle.checked;
+    hostAction('chatEnabled', { type: 'chatEnabled', enabled }, (err, res) => {
+      if (err || (res && res.ok === false)) els.chatToggle.checked = !enabled;
+    });
+  });
+
+  // Addendum A1: one RoomService method (`setBoxCount`) behind both the socket action here and
+  // PUT /api/admin/rooms/:id {boxCount} (admin room detail) — server re-deals `picking` for the
+  // new count and frees any lock on a box index that no longer exists. Server errors (locked in,
+  // not enough boxes for seated players) surface as a toast via hostAction's ack handling.
+  els.btnBoxcountMinus.addEventListener('click', () => {
+    if (!latestView || latestView.boxCount <= 2) return;
+    hostAction('boxCount', { type: 'setBoxCount', count: latestView.boxCount - 1 });
+  });
+  els.btnBoxcountPlus.addEventListener('click', () => {
+    if (!latestView || latestView.boxCount >= 12) return;
+    hostAction('boxCount', { type: 'setBoxCount', count: latestView.boxCount + 1 });
   });
 
   els.btnStart.addEventListener('click', () => hostAction('start', { type: 'start' }));
@@ -353,13 +433,20 @@
     hostAction('close', { type: 'close' });
   });
 
-  els.copyInvite.addEventListener('click', async () => {
-    const text = `Join at ${location.origin}/join?code=${code} — code ${code}`;
+  els.copyPlayerLink.addEventListener('click', async () => {
     try {
-      await navigator.clipboard.writeText(text);
-      toast('Invite copied!');
+      await navigator.clipboard.writeText(els.playerLink.textContent);
+      toast('Player link copied!');
     } catch {
-      toast('Copy failed — please share the code manually.');
+      toast('Copy failed — please share the link manually.');
+    }
+  });
+  els.copyWatchLink.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(els.watchLink.textContent);
+      toast('Watch link copied!');
+    } catch {
+      toast('Copy failed — please share the link manually.');
     }
   });
 

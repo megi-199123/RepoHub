@@ -19,10 +19,15 @@
     <form id="login-form" class="login-card">
       <div class="login-logo" aria-hidden="true">🎁</div>
       <h1>Backoffice</h1>
-      <p class="muted">Sign in to manage prizes and winners.</p>
+      <p class="muted">Sign in to manage your rooms, prizes and winners.</p>
+      <label class="field">
+        <span>Email or username</span>
+        <!-- type="text", not "email": the bootstrap super-admin signs in as `admin`. -->
+        <input id="login-email" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus />
+      </label>
       <label class="field">
         <span>Password</span>
-        <input id="login-password" type="password" autocomplete="current-password" required autofocus />
+        <input id="login-password" type="password" autocomplete="current-password" required />
       </label>
       <p id="login-error" class="form-error" role="alert" hidden></p>
       <button class="btn btn-primary btn-block" type="submit">Sign in</button>
@@ -35,171 +40,212 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-logo" aria-hidden="true">🎁</span>
-        <span class="brand-name" id="brand-name">Mystery Box</span>
-        <span class="brand-tag">Backoffice</span>
+        <span class="brand-name">Backoffice</span>
+        <span class="brand-tag">Mystery Box</span>
       </div>
       <nav class="tabs" role="tablist">
-        <button class="tab" role="tab" data-tab="prizes" aria-selected="true">Prizes</button>
-        <button class="tab" role="tab" data-tab="settings" aria-selected="false">Settings</button>
-        <button class="tab" role="tab" data-tab="rooms" aria-selected="false">Rooms</button>
+        <button class="tab" role="tab" data-tab="rooms" aria-selected="true">Rooms</button>
         <button class="tab" role="tab" data-tab="winners" aria-selected="false">Winners <span id="winners-count" class="tab-count">0</span></button>
+        <button id="tab-users" class="tab" role="tab" data-tab="users" aria-selected="false" hidden>Users</button>
       </nav>
       <div class="topbar-actions">
-        <a class="btn btn-ghost" href="/" target="_blank" rel="noopener">Open game ↗</a>
+        <span id="user-name" class="user-name" title=""></span>
+        <button id="change-password-btn" class="btn btn-ghost" type="button">Change password</button>
         <button id="logout" class="btn btn-ghost" type="button">Sign out</button>
       </div>
     </header>
 
     <main class="content">
-      <!-- Prizes -->
-      <section class="panel" data-panel="prizes">
-        <div class="panel-head">
-          <div>
-            <h2>Prizes</h2>
-            <p class="muted">What players can find inside the boxes. Weight sets how likely a prize is; stock limits how many can be won.</p>
-          </div>
-          <button id="add-prize" class="btn btn-primary" type="button">＋ Add prize</button>
-        </div>
-
-        <div class="stats" id="prize-stats"></div>
-
-        <div id="odds-note" class="note" hidden></div>
-        <ul id="prize-list" class="prize-list"></ul>
-        <div id="prize-empty" class="empty" hidden>
-          <div class="empty-art">🎁</div>
-          <h3>No prizes yet</h3>
-          <p class="muted">Add your first prize to start the fun.</p>
-        </div>
-      </section>
-
-      <!-- Settings -->
-      <section class="panel" data-panel="settings" hidden>
-        <div class="panel-head">
-          <div>
-            <h2>Settings</h2>
-            <p class="muted">How the game looks and plays.</p>
-          </div>
-        </div>
-
-        <form id="settings-form" class="card settings-form">
-          <div class="grid-2">
-            <label class="field">
-              <span>Title</span>
-              <input name="title" maxlength="60" required />
-            </label>
-            <label class="field">
-              <span>Subtitle</span>
-              <input name="subtitle" maxlength="160" />
-            </label>
-          </div>
-
-          <div class="grid-2">
-            <div class="field">
-              <span>Number of boxes <output id="box-count-out" class="pill">4</output></span>
-              <input name="boxCount" type="range" min="2" max="12" step="1" />
-              <div class="range-scale"><span>2</span><span>12</span></div>
-            </div>
-            <label class="field">
-              <span>Box style</span>
-              <select name="boxStyle" class="select">
-                <option value="gift">🎁 Gift box</option>
-                <option value="card">🃏 Card</option>
-                <option value="suitcase">💼 Suitcase</option>
-                <option value="chest">🗝️ Treasure chest</option>
-                <option value="egg">🥚 Egg</option>
-              </select>
-            </label>
-          </div>
-
-          <fieldset class="field">
-            <legend>How prizes go into boxes</legend>
-            <div class="choice-grid">
-              <label class="choice">
-                <input type="radio" name="assignment" value="unique" />
-                <span class="choice-body">
-                  <strong>🎯 Different prize in every box</strong>
-                  <span class="muted">Each box holds a different prize (while there are enough). With 4 prizes and 4 boxes, every prize is in play each round. Weight decides which prizes make it in when there are more prizes than boxes.</span>
-                </span>
-              </label>
-              <label class="choice">
-                <input type="radio" name="assignment" value="weighted" />
-                <span class="choice-body">
-                  <strong>🎲 Pure odds</strong>
-                  <span class="muted">Every box is an independent draw, so the same prize can appear in several boxes. Weight maps directly to the chance of winning.</span>
-                </span>
-              </label>
-            </div>
-          </fieldset>
-
-          <div class="grid-2">
-            <label class="switch-row">
-              <input name="showPrizes" type="checkbox" class="switch" />
-              <span>
-                <strong>Show “What's inside?”</strong>
-                <span class="muted">Display the prize lineup above the boxes.</span>
-              </span>
-            </label>
-            <label class="field">
-              <span>Plays per visitor</span>
-              <input name="maxPlaysPerVisitor" type="number" min="0" max="1000" step="1" />
-              <small class="muted">0 = unlimited. Tracked per browser.</small>
-            </label>
-          </div>
-
-          <p id="settings-error" class="form-error" role="alert" hidden></p>
-          <div class="form-actions">
-            <button class="btn btn-primary" type="submit">Save settings</button>
-          </div>
-        </form>
-      </section>
-
       <!-- Rooms -->
-      <section class="panel" data-panel="rooms" hidden>
-        <div class="panel-head">
-          <div>
-            <h2>Rooms</h2>
-            <p class="muted">Create a multiplayer room and share the code — players join from their own phone or laptop at <strong>/join</strong>.</p>
+      <section class="panel" data-panel="rooms">
+        <div id="rooms-list-view">
+          <div class="panel-head">
+            <div>
+              <h2>Rooms</h2>
+              <p class="muted">Your rooms. Share a code or link — you own the prizes, settings and winners for each one.</p>
+            </div>
+            <div class="head-actions">
+              <label class="check"><input id="show-closed" type="checkbox" /> Show closed</label>
+              <button id="create-room-btn" class="btn btn-primary" type="button">＋ Create room</button>
+            </div>
+          </div>
+
+          <ul id="room-list" class="room-list"></ul>
+          <div id="room-empty" class="empty small" hidden>
+            <div class="empty-art">🚪</div>
+            <p class="muted">No rooms yet. Create one above to get started.</p>
           </div>
         </div>
 
-        <form id="room-form" class="card room-form">
-          <div class="grid-2">
-            <label class="field">
-              <span>Box style</span>
-              <select name="style" class="select">
-                <option value="gift">🎁 Gift box</option>
-                <option value="card">🃏 Card</option>
-                <option value="suitcase">💼 Suitcase</option>
-                <option value="chest">🗝️ Treasure chest</option>
-                <option value="egg">🥚 Egg</option>
-              </select>
-            </label>
-            <label class="field">
-              <span>Number of boxes</span>
-              <input name="boxCount" type="number" min="2" max="12" step="1" required />
-            </label>
+        <div id="room-detail-view" hidden>
+          <div class="panel-head">
+            <div>
+              <button id="room-detail-back" class="btn btn-ghost rd-back" type="button">← Rooms</button>
+              <h2 id="rd-title-heading">Room</h2>
+              <p class="muted rd-meta">
+                <span id="rd-type-badge" class="chip"></span>
+                <span id="rd-status-badge" class="chip"></span>
+                Code <strong id="rd-code"></strong>
+              </p>
+            </div>
+            <div class="head-actions">
+              <a id="rd-host-console" class="btn btn-primary" href="#" target="_blank" rel="noopener" hidden>Open host console ↗</a>
+              <button id="rd-close-room" class="btn btn-danger-ghost" type="button">Close room</button>
+            </div>
           </div>
-          <label class="field">
-            <span>Countdown seconds <small class="muted">(optional — the host can also start one later)</small></span>
-            <input name="countdownSeconds" type="number" min="5" max="120" step="1" placeholder="e.g. 15" />
-          </label>
-          <p id="room-error" class="form-error" role="alert" hidden></p>
-          <div class="form-actions">
-            <button class="btn btn-primary" type="submit">Create room</button>
+
+          <div id="rd-closed-banner" class="note" hidden>This room is closed — settings and prizes are read-only. Winners are still visible below.</div>
+          <div id="rd-locked-note" class="note" hidden>This room has already started — only the title, subtitle and prize lineup can change now.</div>
+
+          <!-- Addendum A2: managed rooms get two separate links (same code) — a player seats
+               into the game, a watcher only ever gets a view-only board. -->
+          <div id="rd-links-row" class="card rd-links-card" hidden>
+            <div class="rd-link-item">
+              <span class="muted">Player link:</span>
+              <code id="rd-player-link" class="rd-play-link"></code>
+              <button id="rd-player-copy" class="btn btn-ghost" type="button">Copy</button>
+              <a id="rd-player-open" class="btn btn-ghost" href="#" target="_blank" rel="noopener">Open ↗</a>
+            </div>
+            <div class="rd-link-item">
+              <span class="muted">Watch link:</span>
+              <code id="rd-watch-link" class="rd-play-link"></code>
+              <button id="rd-watch-copy" class="btn btn-ghost" type="button">Copy</button>
+              <a id="rd-watch-open" class="btn btn-ghost" href="#" target="_blank" rel="noopener">Open ↗</a>
+            </div>
           </div>
-        </form>
 
-        <div id="room-created" class="card room-created" hidden>
-          <span class="muted">Room created — share this code:</span>
-          <strong id="room-created-code" class="room-created-code"></strong>
-          <button id="room-created-copy" class="btn btn-ghost" type="button">Copy invite</button>
-          <a id="room-created-open" class="btn btn-primary" href="#" target="_blank" rel="noopener">Open host console ↗</a>
-        </div>
+          <div id="rd-play-link-row" class="card room-created" hidden>
+            <span class="muted">Play link:</span>
+            <code id="rd-play-link" class="rd-play-link"></code>
+            <button id="rd-play-copy" class="btn btn-ghost" type="button">Copy</button>
+            <a id="rd-play-open" class="btn btn-primary" href="#" target="_blank" rel="noopener">Open ↗</a>
+          </div>
 
-        <ul id="room-list" class="room-list"></ul>
-        <div id="room-empty" class="empty small" hidden>
-          <div class="empty-art">🚪</div>
-          <p class="muted">No active rooms. Create one above to get started.</p>
+          <form id="room-settings-form" class="card settings-form">
+            <fieldset id="room-settings-fieldset" class="rd-fieldset">
+              <div class="grid-2">
+                <label class="field">
+                  <span>Title</span>
+                  <input name="title" maxlength="60" required />
+                </label>
+                <label class="field">
+                  <span>Subtitle</span>
+                  <input name="subtitle" maxlength="160" />
+                </label>
+              </div>
+
+              <div class="grid-2">
+                <div class="field">
+                  <span>Number of boxes <output id="rd-box-count-out" class="pill">4</output></span>
+                  <input name="boxCount" type="range" min="2" max="12" step="1" />
+                  <div class="range-scale"><span>2</span><span>12</span></div>
+                </div>
+                <label class="field">
+                  <span>Box style</span>
+                  <select name="style" class="select">
+                    <option value="gift">🎁 Gift box</option>
+                    <option value="card">🃏 Card</option>
+                    <option value="suitcase">💼 Suitcase</option>
+                    <option value="chest">🗝️ Treasure chest</option>
+                    <option value="egg">🥚 Egg</option>
+                  </select>
+                </label>
+              </div>
+
+              <fieldset class="field">
+                <legend>How prizes go into boxes</legend>
+                <div class="choice-grid">
+                  <label class="choice">
+                    <input type="radio" name="assignment" value="unique" />
+                    <span class="choice-body">
+                      <strong>🎯 Different prize in every box</strong>
+                      <span class="muted">Each box holds a different prize (while there are enough). Weight decides which prizes make it in when there are more prizes than boxes.</span>
+                    </span>
+                  </label>
+                  <label class="choice">
+                    <input type="radio" name="assignment" value="weighted" />
+                    <span class="choice-body">
+                      <strong>🎲 Pure odds</strong>
+                      <span class="muted">Every box is an independent draw, so the same prize can appear in several boxes. Weight maps directly to the chance of winning.</span>
+                    </span>
+                  </label>
+                </div>
+              </fieldset>
+
+              <div class="grid-2">
+                <label class="switch-row">
+                  <input name="showPrizes" type="checkbox" class="switch" />
+                  <span>
+                    <strong>Show “What's inside?”</strong>
+                    <span class="muted">Display the prize lineup above the boxes.</span>
+                  </span>
+                </label>
+                <label id="rd-maxplays-field" class="field">
+                  <span>Plays per visitor</span>
+                  <input name="maxPlaysPerVisitor" type="number" min="0" max="1000" step="1" />
+                  <small class="muted">0 = unlimited. Tracked per browser.</small>
+                </label>
+                <label id="rd-countdown-field" class="field" hidden>
+                  <span>Countdown seconds <small class="muted">(optional — the host can also start one later)</small></span>
+                  <input name="countdownSeconds" type="number" min="5" max="120" step="1" placeholder="e.g. 15" />
+                </label>
+                <label id="rd-chat-field" class="switch-row" hidden>
+                  <input name="chatEnabled" type="checkbox" class="switch" />
+                  <span>
+                    <strong>Enable chat</strong>
+                    <span class="muted">Let players and watchers send messages and reactions.</span>
+                  </span>
+                </label>
+              </div>
+            </fieldset>
+
+            <p id="room-settings-error" class="form-error" role="alert" hidden></p>
+            <div class="form-actions">
+              <button class="btn btn-primary" type="submit">Save settings</button>
+            </div>
+          </form>
+
+          <section class="rd-section">
+            <div class="panel-head">
+              <div>
+                <h2>Prizes</h2>
+                <p class="muted">What players can find inside this room's boxes.</p>
+              </div>
+              <button id="rd-add-prize" class="btn btn-primary" type="button">＋ Add prize</button>
+            </div>
+
+            <div class="stats" id="rd-prize-stats"></div>
+            <div id="rd-odds-note" class="note" hidden></div>
+            <ul id="rd-prize-list" class="prize-list"></ul>
+            <div id="rd-prize-empty" class="empty small" hidden>
+              <div class="empty-art">🎁</div>
+              <h3>No prizes yet</h3>
+              <p class="muted">Add the first prize for this room.</p>
+            </div>
+          </section>
+
+          <section class="rd-section">
+            <div class="panel-head">
+              <div>
+                <h2>Winners</h2>
+                <p class="muted">Everyone who's opened a box in this room.</p>
+              </div>
+            </div>
+            <div class="card table-card">
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr><th>When</th><th>Player</th><th>Prize</th><th>Claim code</th><th class="right">Redeemed</th></tr>
+                  </thead>
+                  <tbody id="rd-draw-rows"></tbody>
+                </table>
+              </div>
+              <div id="rd-draw-empty" class="empty small" hidden>
+                <div class="empty-art">🏆</div>
+                <p class="muted">No plays yet.</p>
+              </div>
+            </div>
+          </section>
         </div>
       </section>
 
@@ -208,10 +254,10 @@
         <div class="panel-head">
           <div>
             <h2>Winners</h2>
-            <p class="muted">Every box opened, with claim codes for redeeming prizes.</p>
+            <p class="muted">Every box opened across your rooms, with claim codes for redeeming prizes.</p>
           </div>
           <div class="head-actions">
-            <a class="btn btn-ghost" href="/api/admin/draws.csv" download>Export CSV</a>
+            <a id="draws-csv-link" class="btn btn-ghost" href="/api/admin/draws.csv" download>Export CSV</a>
             <button id="clear-draws" class="btn btn-danger-ghost" type="button">Clear log</button>
           </div>
         </div>
@@ -220,7 +266,10 @@
 
         <div class="card table-card">
           <div class="table-tools">
-            <input id="draw-search" class="search" type="search" placeholder="Search claim code, prize or player…" />
+            <input id="draw-search" class="search" type="search" placeholder="Search claim code, prize, player or room…" />
+            <select id="draw-room-filter" class="select">
+              <option value="">All rooms</option>
+            </select>
             <select id="draw-filter" class="select">
               <option value="all">All plays</option>
               <option value="pending">Wins to redeem</option>
@@ -231,7 +280,7 @@
           <div class="table-wrap">
             <table class="table">
               <thead>
-                <tr><th>When</th><th>Player</th><th>Prize</th><th>Claim code</th><th class="right">Redeemed</th></tr>
+                <tr><th>When</th><th>Room</th><th>Player</th><th>Prize</th><th>Claim code</th><th class="right">Redeemed</th></tr>
               </thead>
               <tbody id="draw-rows"></tbody>
             </table>
@@ -242,8 +291,151 @@
           </div>
         </div>
       </section>
+
+      <!-- Users -->
+      <section class="panel" data-panel="users" hidden>
+        <div class="panel-head">
+          <div>
+            <h2>Users</h2>
+            <p class="muted">Tenants who can sign in to this backoffice. Accounts are created here only — no email is sent, so share the sign-in details yourself.</p>
+          </div>
+          <button id="invite-user-btn" class="btn btn-primary" type="button">＋ Add user</button>
+        </div>
+
+        <div class="card table-card">
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr><th>Email</th><th>Name</th><th>Role</th><th>Rooms</th><th>Status</th><th class="right">Actions</th></tr>
+              </thead>
+              <tbody id="user-rows"></tbody>
+            </table>
+          </div>
+          <div id="user-empty" class="empty small" hidden>
+            <div class="empty-art">👤</div>
+            <p class="muted">No users yet.</p>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
+
+  <!-- ============ Create room dialog ============ -->
+  <dialog id="room-dialog" class="dialog dialog-md">
+    <form id="room-form" method="dialog" class="editor-main">
+      <header class="dialog-head">
+        <h2>Create room</h2>
+        <button class="icon-close" type="button" data-close aria-label="Close">✕</button>
+      </header>
+
+      <fieldset class="field">
+        <legend>Room type</legend>
+        <div class="choice-grid">
+          <label class="choice">
+            <input type="radio" name="type" value="managed" checked />
+            <span class="choice-body">
+              <strong>🎬 Managed</strong>
+              <span class="muted">A live, host-run game on a big screen — players join with a code and their name on their own phones.</span>
+            </span>
+          </label>
+          <label class="choice">
+            <input type="radio" name="type" value="default" />
+            <span class="choice-body">
+              <strong>🔗 Default</strong>
+              <span class="muted">Always-on shuffle &amp; pick — anyone can play any time from a link, no name needed.</span>
+            </span>
+          </label>
+        </div>
+      </fieldset>
+
+      <div class="grid-2">
+        <label class="field">
+          <span>Title</span>
+          <input name="title" maxlength="60" placeholder="Mystery Box" />
+        </label>
+        <label class="field">
+          <span>Subtitle</span>
+          <input name="subtitle" maxlength="160" />
+        </label>
+      </div>
+
+      <div class="grid-2">
+        <label class="field">
+          <span>Number of boxes</span>
+          <input name="boxCount" type="number" min="2" max="12" step="1" value="4" />
+        </label>
+        <label class="field">
+          <span>Box style</span>
+          <select name="style" class="select">
+            <option value="gift">🎁 Gift box</option>
+            <option value="card">🃏 Card</option>
+            <option value="suitcase">💼 Suitcase</option>
+            <option value="chest">🗝️ Treasure chest</option>
+            <option value="egg">🥚 Egg</option>
+          </select>
+        </label>
+      </div>
+
+      <fieldset class="field">
+        <legend>How prizes go into boxes</legend>
+        <div class="choice-grid">
+          <label class="choice">
+            <input type="radio" name="assignment" value="unique" checked />
+            <span class="choice-body">
+              <strong>🎯 Different prize in every box</strong>
+              <span class="muted">Each box holds a different prize (while there are enough).</span>
+            </span>
+          </label>
+          <label class="choice">
+            <input type="radio" name="assignment" value="weighted" />
+            <span class="choice-body">
+              <strong>🎲 Pure odds</strong>
+              <span class="muted">Every box is an independent draw — the same prize can repeat.</span>
+            </span>
+          </label>
+        </div>
+      </fieldset>
+
+      <div class="grid-2">
+        <label class="switch-row">
+          <input name="showPrizes" type="checkbox" class="switch" checked />
+          <span>
+            <strong>Show “What's inside?”</strong>
+            <span class="muted">Display the prize lineup above the boxes.</span>
+          </span>
+        </label>
+        <label id="room-dialog-maxplays" class="field">
+          <span>Plays per visitor</span>
+          <input name="maxPlaysPerVisitor" type="number" min="0" max="1000" step="1" value="0" />
+          <small class="muted">0 = unlimited. Default rooms only.</small>
+        </label>
+        <label id="room-dialog-countdown" class="field" hidden>
+          <span>Countdown seconds <small class="muted">(optional)</small></span>
+          <input name="countdownSeconds" type="number" min="5" max="120" step="1" placeholder="e.g. 15" />
+        </label>
+        <label id="room-dialog-chat" class="switch-row" hidden>
+          <input name="chatEnabled" type="checkbox" class="switch" checked />
+          <span>
+            <strong>Enable chat</strong>
+            <span class="muted">Let players and watchers send messages and reactions.</span>
+          </span>
+        </label>
+      </div>
+
+      <label class="field">
+        <span>Copy prizes from <small class="muted">(optional — otherwise sample prizes are added)</small></span>
+        <select name="copyPrizesFrom" class="select">
+          <option value="">— Sample prizes —</option>
+        </select>
+      </label>
+
+      <p id="room-dialog-error" class="form-error" role="alert" hidden></p>
+      <div class="form-actions">
+        <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+        <button class="btn btn-primary" type="submit">Create room</button>
+      </div>
+    </form>
+  </dialog>
 
   <!-- ============ Prize editor ============ -->
   <dialog id="prize-dialog" class="dialog">
@@ -281,6 +473,10 @@
             <input name="image" class="grow" placeholder="…or paste an image URL" />
             <button id="image-clear" class="btn btn-ghost" type="button">Remove</button>
           </div>
+          <label class="switch-row">
+            <input name="imageBorder" type="checkbox" class="switch" />
+            <span><strong>Border around the image</strong><span class="muted">Turn off for transparent PNGs or logos.</span></span>
+          </label>
         </div>
 
         <div class="field">
@@ -333,6 +529,75 @@
           <span class="preview-desc" id="preview-desc"></span>
         </div>
       </aside>
+    </form>
+  </dialog>
+
+  <!-- ============ Change password ============ -->
+  <dialog id="password-dialog" class="dialog dialog-sm">
+    <form id="password-form" method="dialog" class="confirm">
+      <h2>Change password</h2>
+      <label class="field">
+        <span>Current password</span>
+        <input name="currentPassword" type="password" autocomplete="current-password" required />
+      </label>
+      <label class="field">
+        <span>New password</span>
+        <input name="newPassword" type="password" autocomplete="new-password" minlength="8" required />
+        <small class="muted">At least 8 characters.</small>
+      </label>
+      <p id="password-error" class="form-error" role="alert" hidden></p>
+      <div class="form-actions">
+        <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+        <button class="btn btn-primary" type="submit">Change password</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ============ Invite user ============ -->
+  <dialog id="invite-dialog" class="dialog dialog-sm">
+    <form id="invite-form" method="dialog" class="confirm">
+      <h2>Add user</h2>
+      <label class="field">
+        <span>Email</span>
+        <input name="email" type="email" autocomplete="off" required />
+      </label>
+      <label class="field">
+        <span>Name</span>
+        <input name="name" maxlength="60" required />
+      </label>
+      <label class="field">
+        <span>Temporary password</span>
+        <input name="password" type="text" minlength="8" required placeholder="At least 8 characters" />
+      </label>
+      <label class="field">
+        <span>Role</span>
+        <select name="role" class="select">
+          <option value="user">Tenant</option>
+          <option value="superadmin">Super-admin</option>
+        </select>
+      </label>
+      <p id="invite-error" class="form-error" role="alert" hidden></p>
+      <div class="form-actions">
+        <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+        <button class="btn btn-primary" type="submit">Create account</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ============ Reset a user's password ============ -->
+  <dialog id="reset-password-dialog" class="dialog dialog-sm">
+    <form id="reset-password-form" method="dialog" class="confirm">
+      <h2>Reset password</h2>
+      <p id="reset-password-for" class="muted"></p>
+      <label class="field">
+        <span>New temporary password</span>
+        <input name="password" type="text" minlength="8" required placeholder="At least 8 characters" />
+      </label>
+      <p id="reset-password-error" class="form-error" role="alert" hidden></p>
+      <div class="form-actions">
+        <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+        <button class="btn btn-primary" type="submit">Reset password</button>
+      </div>
     </form>
   </dialog>
 

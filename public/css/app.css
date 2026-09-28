@@ -66,6 +66,37 @@ button { font: inherit; color: inherit; }
 
 .hero { text-align: center; }
 
+/* Room-scoped play.html (tenant-rooms): a quiet escape hatch back to the code-entry
+   landing page — sits above the badge, never competes with it for attention. */
+.back-link {
+  display: inline-block;
+  margin-bottom: 12px;
+  color: var(--ink-mute);
+  font-size: 13px;
+  text-decoration: none;
+}
+.back-link:hover { color: var(--ink-soft); text-decoration: underline; }
+
+/* ---------- friendly state screen (missing/invalid code, ended room, rate limit) ---------- */
+
+.state-screen { width: 100%; display: flex; justify-content: center; }
+.state-screen[hidden] { display: none; }
+.stage[hidden], .controls[hidden] { display: none; }
+.state-card {
+  width: min(420px, 100%);
+  margin-top: 4vh;
+  padding: 34px 28px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 24px 60px -30px rgba(43, 34, 51, 0.28);
+  text-align: center;
+}
+.state-emoji { font-size: 48px; margin-bottom: 10px; }
+.state-card h2 { margin: 0 0 8px; font: 700 clamp(22px, 5vw, 28px)/1.2 var(--font-display); }
+.state-message { margin: 0 0 22px; color: var(--ink-soft); line-height: 1.5; }
+.state-card .btn-primary { display: inline-flex; text-decoration: none; }
+
 .badge {
   display: inline-flex;
   align-items: center;
@@ -130,6 +161,11 @@ button { font: inherit; color: inherit; }
   overflow: hidden;
 }
 .lineup-art img { width: 100%; height: 100%; object-fit: cover; }
+/* B1 (prize image border option): transparent PNGs/logos skip the round tile, gradient fill
+   and shadow, and are never cropped. Only ever applied when the prize actually has an image —
+   emoji prizes are unaffected. */
+.lineup-art.no-border { border-radius: 0; background: none; box-shadow: none; }
+.lineup-art.no-border img { object-fit: contain; }
 .lineup-name { font-weight: 600; font-size: 14px; }
 
 @keyframes pop-in { from { opacity: 0; transform: translateY(8px) scale(0.9); } }
@@ -318,6 +354,7 @@ button { font: inherit; color: inherit; }
   transition: transform 0.8s var(--ease-spring), opacity 0.3s;
 }
 .box-prize img { width: 100%; height: 100%; object-fit: cover; border-radius: 18px; border: 3px solid #fff; }
+.box-prize.no-border img { border: 0; border-radius: 0; object-fit: contain; }
 
 .box-glow {
   position: absolute;
@@ -696,6 +733,8 @@ button { font: inherit; color: inherit; }
   overflow: hidden;
 }
 .reveal-art img { width: 100%; height: 100%; object-fit: cover; }
+.reveal-art.no-border { border-radius: 0; background: none; box-shadow: none; }
+.reveal-art.no-border img { object-fit: contain; }
 @keyframes art-in { from { transform: scale(0) rotate(-30deg); } }
 @keyframes float { 50% { transform: translateY(-8px) rotate(2deg); } }
 

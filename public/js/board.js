@@ -31,6 +31,8 @@
   function fillBox(box, prize) {
     const slot = box.querySelector('.box-prize');
     slot.replaceChildren(prizeArt(prize));
+    // B1: transparent PNGs/logos skip the tile/border — never true for an emoji-only prize.
+    slot.classList.toggle('no-border', Boolean(prize && prize.image && prize.imageBorder === false));
     box.querySelector('.box-label').textContent = prize ? prize.name : 'Out of stock';
     box.style.setProperty('--prize', prize ? prize.color : '#94a3b8');
   }

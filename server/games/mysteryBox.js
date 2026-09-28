@@ -10,8 +10,8 @@ const REVEAL_MODES = ['all', 'next'];
 
 /** Deal boxes and move the room from lobby to picking. Room stays in the lobby on failure. */
 async function start({ store }, room) {
-  const [settings, prizes] = await Promise.all([store.getSettings(), store.listPrizes()]);
-  const boxes = fillBoxes(prizes, room.boxCount, settings.assignment);
+  const prizes = await store.listPrizes(room.id);
+  const boxes = fillBoxes(prizes, room.boxCount, room.settings.assignment);
   if (!boxes) throw new HttpError(409, 'All prizes have been claimed. Check back soon!');
   const updated = await store.beginPicking(room.id, boxes);
   if (!updated) throw new HttpError(409, 'This room has already started');
@@ -115,11 +115,11 @@ async function reveal({ store, room }, mode) {
     for (const player of lockedPlayers) {
       const box = player.lockedBox;
       const dealtId = began.boxes[box];
-      let prize = await store.takePrize(q, dealtId);
+      let prize = await store.takePrize(q, room.id, dealtId);
       for (let attempt = 0; !prize && attempt < 5; attempt++) {
-        const pool = (await store.listPrizes(q)).filter(isAvailable);
+        const pool = (await store.listPrizes(room.id, q)).filter(isAvailable);
         if (pool.length === 0) break;
-        prize = await store.takePrize(q, weightedPick(pool).id);
+        prize = await store.takePrize(q, room.id, weightedPick(pool).id);
       }
       // If literally nothing was available (every prize exhausted mid-reveal), record no prize at
       // all rather than crediting the player with the dealt id they never actually received —

@@ -25,9 +25,25 @@
       <div class="host-code-block">
         <span class="host-code-label">Room code</span>
         <strong id="host-code" class="host-code">------</strong>
+        <span id="host-title" class="host-title"></span>
       </div>
-      <button id="copy-invite" class="btn btn-ghost" type="button">Copy invite</button>
     </header>
+
+    <!-- Addendum A2: two separate links (same room code) — a player seats into the game, a
+         watcher only ever gets a view-only board. Shown readably (not just copy buttons) since
+         this screen is usually projected. -->
+    <div class="host-links">
+      <div class="host-link-row">
+        <span class="host-link-label">Player link</span>
+        <code id="host-player-link" class="host-link-url"></code>
+        <button id="copy-player-link" class="btn btn-ghost" type="button">Copy</button>
+      </div>
+      <div class="host-link-row">
+        <span class="host-link-label">Watch link</span>
+        <code id="host-watch-link" class="host-link-url"></code>
+        <button id="copy-watch-link" class="btn btn-ghost" type="button">Copy</button>
+      </div>
+    </div>
 
     <p id="reconnect-banner" class="reconnect-banner" role="status" hidden></p>
 
@@ -48,7 +64,7 @@
 
       <aside class="host-panel card">
         <div class="host-panel-section">
-          <h2>Players</h2>
+          <h2>Players <span id="watching-count" class="host-watching-count" hidden></span></h2>
           <ul id="player-list" class="host-player-list"></ul>
           <p id="player-empty" class="muted small" hidden>No one has joined yet.</p>
         </div>
@@ -62,6 +78,24 @@
               <span class="muted">Stop new players from joining.</span>
             </span>
           </label>
+
+          <!-- Addendum B2 -->
+          <label class="switch-row host-switch-row">
+            <input id="chat-toggle" type="checkbox" class="switch" disabled />
+            <span>
+              <strong>Chat</strong>
+              <span class="muted">Let players and watchers send messages and reactions.</span>
+            </span>
+          </label>
+
+          <!-- Addendum A1: box count can change in lobby AND while picking (re-deals and frees
+               any lock on a box index that no longer exists) — disabled the rest of the time. -->
+          <div class="host-boxcount-row">
+            <span class="host-boxcount-label">Boxes</span>
+            <button id="btn-boxcount-minus" class="btn btn-ghost host-boxcount-btn" type="button" aria-label="Fewer boxes" disabled>−</button>
+            <output id="boxcount-value" class="host-boxcount-value" for="btn-boxcount-minus btn-boxcount-plus">4</output>
+            <button id="btn-boxcount-plus" class="btn btn-ghost host-boxcount-btn" type="button" aria-label="More boxes" disabled>+</button>
+          </div>
 
           <div class="host-actions">
             <!-- Disabled by default in markup (not just after the first render): C3 — a host
@@ -82,6 +116,14 @@
 
             <button id="btn-close" class="btn btn-danger-ghost btn-block" type="button" disabled>Close room</button>
           </div>
+        </div>
+
+        <!-- Addendum B2: the embedded chat core (message list, composer, reactions) is built by
+             window.Chat.create({variant:'embedded', mountEl: this}) in admin/room.js — a readable
+             side panel for the big screen, with a trash button on each message. -->
+        <div class="host-panel-section">
+          <h2>Chat</h2>
+          <div id="host-chat-mount" class="host-chat-mount"></div>
         </div>
       </aside>
     </div>
@@ -114,6 +156,7 @@
   <script src="/js/fx.js"></script>
   <script src="/js/boxes.js"></script>
   <script src="/js/board.js"></script>
+  <script src="/js/chat.js"></script>
   <script src="/admin/room.js"></script>
 </body>
 </html>
