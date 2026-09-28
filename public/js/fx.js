@@ -196,6 +196,12 @@
       tone(392, { at: 0.05, dur: 0.3, type: 'triangle', vol: 0.12 });
       tone(311.13, { at: 0.32, dur: 0.5, type: 'triangle', vol: 0.12, slide: 0.94 });
     },
+    // Addendum B2: subtle two-note "new chat message" chime — quieter and shorter than pop() so
+    // it doesn't compete with box-opening sounds during a live round. Respects the same mute flag.
+    chime() {
+      tone(740, { dur: 0.09, type: 'sine', vol: 0.09 });
+      tone(1108.7, { at: 0.07, dur: 0.14, type: 'sine', vol: 0.07 });
+    },
   };
 
   window.FX = { startStars, burst, rain, sound, reducedMotion };

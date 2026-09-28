@@ -6,7 +6,6 @@ const express = require('express');
 const { Store, newId } = require('./store');
 const { openDatabase } = require('./db');
 const { fillBoxes, estimateOdds, isAvailable, weightedPick } = require('./draw');
-const { STYLES } = require('./rooms/constants');
 const { attachRealtime } = require('./realtime');
 const { RoomService } = require('./rooms/service');
 const games = require('./games');
@@ -15,18 +14,16 @@ const { str, int } = require('./validate');
 const { parseCookies } = require('./cookies');
 const { claimCode } = require('./codes');
 const { publicPrize } = require('./prizeView');
-const { clientIp } = require('./ratelimit');
+const { clientIp, createFailureLimiter } = require('./ratelimit');
+const { hashPassword, verifyPassword } = require('./auth');
 
 const ROUND_TTL_MS = 30 * 60 * 1000;
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+const LOGIN_FAILURE_WINDOW_MS = 15 * 60 * 1000;
+const MAX_LOGIN_FAILURES = 10;
+const MIN_PASSWORD_LEN = 8;
 const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
 const IMAGE_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' };
-
-function safeEqual(a, b) {
-  const ha = crypto.createHash('sha256').update(String(a)).digest();
-  const hb = crypto.createHash('sha256').update(String(b)).digest();
-  return crypto.timingSafeEqual(ha, hb);
-}
 
 function validatePrize(body, existing = {}) {
   const merged = { ...existing, ...body };
@@ -41,6 +38,7 @@ function validatePrize(body, existing = {}) {
     description: str(merged.description, 'Description', { max: 200 }),
     emoji: str(merged.emoji || '🎁', 'Emoji', { max: 16 }),
     image,
+    imageBorder: merged.imageBorder !== false,
     color,
     weight: int(merged.weight ?? 1, 'Weight', 0, 100000),
     stock: merged.stock === null || merged.stock === '' || merged.stock === undefined
@@ -51,34 +49,25 @@ function validatePrize(body, existing = {}) {
   };
 }
 
-function validateSettings(body, current) {
-  const merged = { ...current, ...body };
-  if (!['unique', 'weighted'].includes(merged.assignment)) {
-    throw new HttpError(400, 'Assignment must be "unique" or "weighted"');
+function requirePassword(pw, field = 'Password') {
+  if (typeof pw !== 'string' || pw.length < MIN_PASSWORD_LEN) {
+    throw new HttpError(400, `${field} must be at least ${MIN_PASSWORD_LEN} characters`);
   }
-  if (!STYLES.includes(merged.boxStyle)) {
-    throw new HttpError(400, `Box style must be one of: ${STYLES.join(', ')}`);
-  }
-  return {
-    title: str(merged.title, 'Title', { max: 60, required: true }),
-    subtitle: str(merged.subtitle, 'Subtitle', { max: 160 }),
-    boxCount: int(merged.boxCount, 'Number of boxes', 2, 12),
-    assignment: merged.assignment,
-    showPrizes: Boolean(merged.showPrizes),
-    maxPlaysPerVisitor: int(merged.maxPlaysPerVisitor ?? 0, 'Plays per visitor', 0, 1000),
-    boxStyle: merged.boxStyle,
-  };
+  return pw;
 }
+
+const authUserView = (u) => ({ id: u.id, email: u.email, name: u.name, role: u.role });
+const adminUserView = (u) => ({ id: u.id, email: u.email, name: u.name, role: u.role, disabled: u.disabled, createdAt: u.createdAt, roomCount: u.roomCount ?? 0 });
 
 // ---------- app ----------
 
 /**
  * Build the Express app. The database connects lazily on the first request,
- * which suits serverless hosts (Vercel) as well as a long-running server.
+ * which suits serverless hosts as well as a long-running server.
  *
  * Options: `db` (an already-open handle, used by tests) or `databaseUrl` / `dataDir`.
  */
-function createApp({ db, databaseUrl, dataDir, adminPassword, countdownMsOverride }) {
+function createApp({ db, databaseUrl, dataDir, adminPassword, adminEmail, countdownMsOverride }) {
   let store;
   let roomService;
   let io = null;
@@ -88,7 +77,7 @@ function createApp({ db, databaseUrl, dataDir, adminPassword, countdownMsOverrid
   const connect = () => {
     connecting ||= (async () => {
       const s = new Store(db || (await openDatabase({ databaseUrl, dataDir })));
-      await s.migrate();
+      await s.migrate({ adminPassword, adminEmail });
       store = s;
       roomService = new RoomService({ store: s, games, countdownMsOverride });
       await roomService.ready;
@@ -103,6 +92,8 @@ function createApp({ db, databaseUrl, dataDir, adminPassword, countdownMsOverrid
   };
   const ready = connect();
   ready.catch(() => {}); // reported above; requests will retry
+
+  const loginLimiter = createFailureLimiter({ max: MAX_LOGIN_FAILURES, windowMs: LOGIN_FAILURE_WINDOW_MS });
 
   const app = express();
   app.disable('x-powered-by');
@@ -137,24 +128,66 @@ function createApp({ db, databaseUrl, dataDir, adminPassword, countdownMsOverrid
     next();
   });
 
-  const playsLeft = async (settings, visitor, q) => {
-    const max = settings.maxPlaysPerVisitor;
-    return max > 0 ? Math.max(0, max - (await store.playsBy(visitor, q))) : null;
+  const playsLeft = async (room, visitor, q) => {
+    const max = room.settings.maxPlaysPerVisitor;
+    return max > 0 ? Math.max(0, max - (await store.playsBy(visitor, room.id, q))) : null;
   };
 
-  // ----- public API -----
+  const sessionUser = async (req) => {
+    const token = req.cookies.mb_session;
+    return token ? store.getSessionUser(token) : null;
+  };
+  const requireSessionUser = async (req) => {
+    const user = await sessionUser(req);
+    if (!user) throw new HttpError(401, 'Please sign in');
+    return user;
+  };
 
-  app.get('/api/config', async (req, res) => {
-    const [s, prizes] = await Promise.all([store.getSettings(), store.listPrizes()]);
-    res.json({
-      title: s.title,
-      subtitle: s.subtitle,
-      boxCount: s.boxCount,
-      boxStyle: s.boxStyle,
-      showPrizes: s.showPrizes,
-      playsLeft: await playsLeft(s, req.visitor),
-      prizes: s.showPrizes ? prizes.filter(isAvailable).map(publicPrize) : [],
-    });
+  // ----- auth -----
+
+  app.post('/api/auth/login', async (req, res) => {
+    const ip = clientIp(req);
+    if (!loginLimiter.allowed(ip)) throw new HttpError(429, 'Too many attempts — wait a few minutes');
+    const email = str(req.body?.email, 'Email', { max: 200, required: true }).toLowerCase();
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+
+    const user = await store.getUserByEmail(email);
+    const ok = Boolean(user) && !user.disabled && await verifyPassword(password, user.passwordHash);
+    if (!ok) {
+      loginLimiter.recordFailure(ip);
+      throw new HttpError(401, 'Wrong email or password');
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    await store.createUserSession(token, user.id, SESSION_TTL_MS);
+    res.append('Set-Cookie', cookie(req, 'mb_session', token, `Path=/; Max-Age=${SESSION_TTL_MS / 1000}; SameSite=Strict; HttpOnly`));
+    res.json({ user: authUserView(user) });
+  });
+
+  app.post('/api/auth/logout', async (req, res) => {
+    if (req.cookies.mb_session) await store.deleteUserSession(req.cookies.mb_session);
+    res.append('Set-Cookie', cookie(req, 'mb_session', '', 'Path=/; Max-Age=0; SameSite=Strict; HttpOnly'));
+    res.json({ ok: true });
+  });
+
+  app.get('/api/auth/me', async (req, res) => {
+    const user = await sessionUser(req);
+    res.json(user ? { authenticated: true, user: authUserView(user) } : { authenticated: false });
+  });
+
+  app.put('/api/auth/password', async (req, res) => {
+    const user = await requireSessionUser(req);
+    const current = typeof req.body?.currentPassword === 'string' ? req.body.currentPassword : '';
+    if (!(await verifyPassword(current, user.passwordHash))) throw new HttpError(400, 'Current password is incorrect');
+    const fresh = requirePassword(req.body?.newPassword, 'New password');
+    await store.updateUser(user.id, { passwordHash: await hashPassword(fresh) });
+    res.json({ ok: true });
+  });
+
+  // ----- public: rooms by code -----
+
+  app.post('/api/rooms/lookup', async (req, res) => {
+    res.json(await roomService.lookup(req.body?.code, clientIp(req)));
   });
 
   app.post('/api/rooms/join', async (req, res) => {
@@ -167,32 +200,52 @@ function createApp({ db, databaseUrl, dataDir, adminPassword, countdownMsOverrid
     res.json(result);
   });
 
-  app.post('/api/rounds', async (req, res) => {
-    const [s, prizes] = await Promise.all([store.getSettings(), store.listPrizes()]);
-    if ((await playsLeft(s, req.visitor)) === 0) throw new HttpError(403, "You've used all your plays. Thanks for playing!");
-    const boxes = fillBoxes(prizes, s.boxCount, s.assignment);
+  app.post('/api/rooms/watch', async (req, res) => {
+    res.json(await roomService.watch(req.body?.code, req.visitor, clientIp(req)));
+  });
+
+  app.get('/api/rooms/:code/config', async (req, res) => {
+    const room = await roomService.resolveDefaultRoomByCode(req.params.code, clientIp(req));
+    const prizes = await store.listPrizes(room.id);
+    res.json({
+      code: room.code,
+      title: room.settings.title,
+      subtitle: room.settings.subtitle,
+      boxCount: room.boxCount,
+      boxStyle: room.style,
+      showPrizes: room.settings.showPrizes,
+      playsLeft: await playsLeft(room, req.visitor),
+      prizes: room.settings.showPrizes ? prizes.filter(isAvailable).map(publicPrize) : [],
+    });
+  });
+
+  app.post('/api/rooms/:code/rounds', async (req, res) => {
+    const room = await roomService.resolveDefaultRoomByCode(req.params.code, clientIp(req));
+    const prizes = await store.listPrizes(room.id);
+    if ((await playsLeft(room, req.visitor)) === 0) throw new HttpError(403, "You've used all your plays. Thanks for playing!");
+    const boxes = fillBoxes(prizes, room.boxCount, room.settings.assignment);
     if (!boxes) throw new HttpError(409, 'All prizes have been claimed. Check back soon!');
-    const roundId = await store.createRound({ visitor: req.visitor, boxes, ttlMs: ROUND_TTL_MS });
+    const roundId = await store.createRound({ roomId: room.id, visitor: req.visitor, boxes, ttlMs: ROUND_TTL_MS });
     res.status(201).json({ roundId, boxCount: boxes.length });
   });
 
-  app.post('/api/rounds/:id/pick', async (req, res) => {
+  app.post('/api/rooms/:code/rounds/:id/pick', async (req, res) => {
+    const room = await roomService.resolveDefaultRoomByCode(req.params.code, clientIp(req));
     const box = int(req.body?.box, 'Box', 0, 11);
-    const settings = await store.getSettings();
 
-    const result = await store.openRound({ roundId: req.params.id, visitor: req.visitor }, async (boxes, q) => {
+    const result = await store.openRound({ roundId: req.params.id, roomId: room.id, visitor: req.visitor }, async (boxes, q) => {
       if (box >= boxes.length) throw new HttpError(400, `Box must be between 0 and ${boxes.length - 1}`);
-      if ((await playsLeft(settings, req.visitor, q)) === 0) {
+      if ((await playsLeft(room, req.visitor, q)) === 0) {
         throw new HttpError(403, "You've used all your plays. Thanks for playing!");
       }
 
       // Take one unit of the box's prize. If it ran out since the round was dealt,
       // swap in something that is still available.
-      let prize = await store.takePrize(q, boxes[box]);
+      let prize = await store.takePrize(q, room.id, boxes[box]);
       for (let attempt = 0; !prize && attempt < 5; attempt++) {
-        const pool = (await store.listPrizes(q)).filter(isAvailable);
+        const pool = (await store.listPrizes(room.id, q)).filter(isAvailable);
         if (pool.length === 0) throw new HttpError(409, 'All prizes have been claimed. Check back soon!');
-        prize = await store.takePrize(q, weightedPick(pool).id);
+        prize = await store.takePrize(q, room.id, weightedPick(pool).id);
       }
       if (!prize) throw new HttpError(409, 'Prizes are going fast — please try again!');
       boxes[box] = prize.id;
@@ -203,14 +256,15 @@ function createApp({ db, databaseUrl, dataDir, adminPassword, countdownMsOverrid
         prizeName: prize.name,
         emoji: prize.emoji,
         visitor: req.visitor,
+        roomId: room.id,
       });
-      const all = new Map((await store.listPrizes(q)).map((p) => [p.id, p]));
+      const all = new Map((await store.listPrizes(room.id, q)).map((p) => [p.id, p]));
       return {
         box,
         prize: publicPrize(prize),
         code: draw.code,
         boxes: boxes.map((id) => (all.has(id) ? publicPrize(all.get(id)) : null)),
-        playsLeft: await playsLeft(settings, req.visitor, q),
+        playsLeft: await playsLeft(room, req.visitor, q),
       };
     });
 
@@ -218,89 +272,90 @@ function createApp({ db, databaseUrl, dataDir, adminPassword, countdownMsOverrid
     res.json(result);
   });
 
-  // ----- admin auth -----
-
-  const isAdmin = async (req) => {
-    const token = req.cookies.mb_admin;
-    return Boolean(token && (await store.isSessionValid(token)));
-  };
-
-  app.post('/api/admin/login', async (req, res) => {
-    if (!adminPassword) throw new HttpError(503, 'ADMIN_PASSWORD is not configured on the server');
-    if (!safeEqual(req.body?.password ?? '', adminPassword)) throw new HttpError(401, 'Wrong password');
-    const token = crypto.randomBytes(32).toString('hex');
-    await store.createSession(token, SESSION_TTL_MS);
-    res.append('Set-Cookie', cookie(req, 'mb_admin', token, `Path=/; Max-Age=${SESSION_TTL_MS / 1000}; SameSite=Strict; HttpOnly`));
-    res.json({ ok: true });
-  });
-
-  app.post('/api/admin/logout', async (req, res) => {
-    if (req.cookies.mb_admin) await store.deleteSession(req.cookies.mb_admin);
-    res.append('Set-Cookie', cookie(req, 'mb_admin', '', 'Path=/; Max-Age=0; SameSite=Strict; HttpOnly'));
-    res.json({ ok: true });
-  });
-
-  app.get('/api/admin/me', async (req, res) => res.json({ authenticated: await isAdmin(req) }));
+  // ----- admin: session gate -----
 
   app.use('/api/admin', async (req, res, next) => {
-    if (!(await isAdmin(req))) throw new HttpError(401, 'Please sign in');
+    req.user = await requireSessionUser(req);
     next();
   });
 
-  // ----- admin: settings -----
+  const requireSuperadmin = (req, res, next) => {
+    if (req.user.role !== 'superadmin') throw new HttpError(403, 'Super-admin only');
+    next();
+  };
 
-  app.get('/api/admin/settings', async (req, res) => res.json(await store.getSettings()));
-
-  app.put('/api/admin/settings', async (req, res) => {
-    const settings = validateSettings(req.body ?? {}, await store.getSettings());
-    res.json(await store.saveSettings(settings));
-  });
-
-  // ----- admin: prizes -----
-
-  app.get('/api/admin/prizes', async (req, res) => {
-    const [prizes, won] = await Promise.all([store.listPrizes(), store.wonCounts()]);
-    res.json(prizes.map((p) => ({ ...p, won: won[p.id] || 0, available: isAvailable(p) })));
-  });
-
-  app.post('/api/admin/prizes', async (req, res) => {
-    res.status(201).json(await store.createPrize(validatePrize(req.body ?? {})));
-  });
-
-  app.put('/api/admin/prizes/:id', async (req, res) => {
-    const existing = await store.getPrize(req.params.id);
-    if (!existing) throw new HttpError(404, 'Prize not found');
-    res.json(await store.updatePrize(req.params.id, validatePrize(req.body ?? {}, existing)));
-  });
-
-  app.delete('/api/admin/prizes/:id', async (req, res) => {
-    if (!(await store.deletePrize(req.params.id))) throw new HttpError(404, 'Prize not found');
-    res.status(204).end();
-  });
-
-  app.put('/api/admin/prizes-order', async (req, res) => {
-    const ids = req.body?.ids;
-    if (!Array.isArray(ids) || !ids.every((id) => typeof id === 'string')) throw new HttpError(400, 'ids must be an array');
-    await store.reorderPrizes(ids);
-    res.json({ ok: true });
-  });
-
-  app.get('/api/admin/odds', async (req, res) => {
-    const [s, prizes] = await Promise.all([store.getSettings(), store.listPrizes()]);
-    res.json(estimateOdds(prizes, s.boxCount, s.assignment));
-  });
+  /** Fetch a room I own, or 404 — used by every /api/admin/rooms/:id/* route. */
+  const ownedRoom = async (req) => {
+    const room = await store.getOwnedRoom(req.user.id, req.params.id);
+    if (!room) throw new HttpError(404, 'Room not found');
+    return room;
+  };
 
   // ----- admin: rooms -----
 
   app.post('/api/admin/rooms', async (req, res) => {
-    res.status(201).json(await roomService.createRoom(req.body ?? {}));
+    res.status(201).json(await roomService.createRoom(req.user.id, req.body ?? {}));
   });
 
-  app.get('/api/admin/rooms', async (req, res) => res.json(await roomService.listRooms()));
+  app.get('/api/admin/rooms', async (req, res) => {
+    res.json(await roomService.listRooms(req.user.id, req.query.include === 'closed'));
+  });
 
-  app.delete('/api/admin/rooms/:code', async (req, res) => {
-    await roomService.closeRoomByCode(req.params.code);
+  app.get('/api/admin/rooms/:id', async (req, res) => {
+    res.json(await roomService.getRoomSummary(req.user.id, req.params.id));
+  });
+
+  app.put('/api/admin/rooms/:id', async (req, res) => {
+    res.json(await roomService.updateRoom(req.user.id, req.params.id, req.body ?? {}));
+  });
+
+  app.delete('/api/admin/rooms/:id', async (req, res) => {
+    await roomService.closeRoomForOwner(req.user.id, req.params.id);
     res.status(204).end();
+  });
+
+  // ----- admin: prizes (room-scoped) -----
+
+  app.get('/api/admin/rooms/:id/prizes', async (req, res) => {
+    const room = await ownedRoom(req);
+    const [prizes, won] = await Promise.all([store.listPrizes(room.id), store.wonCounts(room.id)]);
+    res.json(prizes.map((p) => ({ ...p, won: won[p.id] || 0, available: isAvailable(p) })));
+  });
+
+  app.post('/api/admin/rooms/:id/prizes', async (req, res) => {
+    const room = await ownedRoom(req);
+    if (room.status === 'closed') throw new HttpError(409, 'This room has ended');
+    res.status(201).json(await store.createPrize(room.id, validatePrize(req.body ?? {})));
+  });
+
+  app.put('/api/admin/rooms/:id/prizes/:prizeId', async (req, res) => {
+    const room = await ownedRoom(req);
+    if (room.status === 'closed') throw new HttpError(409, 'This room has ended');
+    const existing = await store.getPrize(room.id, req.params.prizeId);
+    if (!existing) throw new HttpError(404, 'Prize not found');
+    res.json(await store.updatePrize(room.id, req.params.prizeId, validatePrize(req.body ?? {}, existing)));
+  });
+
+  app.delete('/api/admin/rooms/:id/prizes/:prizeId', async (req, res) => {
+    const room = await ownedRoom(req);
+    if (room.status === 'closed') throw new HttpError(409, 'This room has ended');
+    if (!(await store.deletePrize(room.id, req.params.prizeId))) throw new HttpError(404, 'Prize not found');
+    res.status(204).end();
+  });
+
+  app.put('/api/admin/rooms/:id/prizes-order', async (req, res) => {
+    const room = await ownedRoom(req);
+    if (room.status === 'closed') throw new HttpError(409, 'This room has ended');
+    const ids = req.body?.ids;
+    if (!Array.isArray(ids) || !ids.every((id) => typeof id === 'string')) throw new HttpError(400, 'ids must be an array');
+    await store.reorderPrizes(room.id, ids);
+    res.json({ ok: true });
+  });
+
+  app.get('/api/admin/rooms/:id/odds', async (req, res) => {
+    const room = await ownedRoom(req);
+    const prizes = await store.listPrizes(room.id);
+    res.json(estimateOdds(prizes, room.boxCount, room.settings.assignment));
   });
 
   // ----- admin: uploads (stored in the database, so no file storage is needed) -----
@@ -311,22 +366,24 @@ function createApp({ db, databaseUrl, dataDir, adminPassword, countdownMsOverrid
     if (!ext) throw new HttpError(400, 'Upload a PNG, JPG, WebP or GIF image');
     const buffer = Buffer.from(match[2], 'base64');
     if (buffer.length > MAX_UPLOAD_BYTES) throw new HttpError(413, 'Image must be 2 MB or smaller');
-    const id = await store.saveImage(match[1], buffer);
+    const id = await store.saveImage(match[1], buffer, req.user.id);
     res.status(201).json({ url: `/uploads/${id}.${ext}` });
   });
 
-  // ----- admin: draws (winners log) -----
+  // ----- admin: draws (winners log, across my rooms incl. closed) -----
 
-  app.get('/api/admin/draws', async (req, res) => res.json(await store.listDraws()));
+  app.get('/api/admin/draws', async (req, res) => {
+    res.json(await store.listDraws(req.user.id, req.query.roomId || undefined));
+  });
 
   app.patch('/api/admin/draws/:id', async (req, res) => {
-    const draw = await store.setRedeemed(req.params.id, Boolean(req.body?.redeemed));
+    const draw = await store.setRedeemed(req.user.id, req.params.id, Boolean(req.body?.redeemed));
     if (!draw) throw new HttpError(404, 'Draw not found');
     res.json(draw);
   });
 
   app.delete('/api/admin/draws', async (req, res) => {
-    await store.clearDraws();
+    await store.clearDraws(req.user.id, req.query.roomId || undefined);
     res.status(204).end();
   });
 
@@ -340,10 +397,50 @@ function createApp({ db, databaseUrl, dataDir, adminPassword, countdownMsOverrid
       return `"${s.replace(/"/g, '""')}"`;
     };
     const rows = [['Date', 'Claim code', 'Prize', 'Redeemed', 'Redeemed at', 'Player', 'Room']];
-    for (const d of await store.listDraws()) {
+    for (const d of await store.listDraws(req.user.id, req.query.roomId || undefined)) {
       rows.push([d.createdAt, d.code, d.prizeName, d.redeemed ? 'yes' : 'no', d.redeemedAt, d.playerName, d.roomCode]);
     }
     res.type('text/csv').attachment('mystery-box-draws.csv').send(rows.map((r) => r.map(esc).join(',')).join('\n'));
+  });
+
+  // ----- admin: users (superadmin only) -----
+
+  app.get('/api/admin/users', requireSuperadmin, async (req, res) => {
+    res.json((await store.listUsers()).map(adminUserView));
+  });
+
+  app.post('/api/admin/users', requireSuperadmin, async (req, res) => {
+    const email = str(req.body?.email, 'Email', { max: 200, required: true }).toLowerCase();
+    const name = str(req.body?.name, 'Name', { max: 100, required: true });
+    const password = requirePassword(req.body?.password);
+    const role = req.body?.role === 'superadmin' ? 'superadmin' : 'user';
+    if (await store.getUserByEmail(email)) throw new HttpError(409, 'Email already in use');
+    const user = await store.createUser({ email, name, passwordHash: await hashPassword(password), role });
+    res.status(201).json(adminUserView({ ...user, roomCount: 0 }));
+  });
+
+  app.patch('/api/admin/users/:id', requireSuperadmin, async (req, res) => {
+    const target = await store.getUserById(req.params.id);
+    if (!target) throw new HttpError(404, 'User not found');
+    const patch = {};
+    const body = req.body ?? {};
+
+    if (body.name !== undefined) patch.name = str(body.name, 'Name', { max: 100, required: true });
+    if (body.role !== undefined) {
+      if (!['user', 'superadmin'].includes(body.role)) throw new HttpError(400, 'role must be "user" or "superadmin"');
+      if (target.id === req.user.id && body.role !== req.user.role) throw new HttpError(400, 'You cannot change your own role');
+      patch.role = body.role;
+    }
+    if (body.disabled !== undefined) {
+      const disabled = Boolean(body.disabled);
+      if (target.id === req.user.id && disabled) throw new HttpError(400, 'You cannot disable yourself');
+      patch.disabled = disabled;
+    }
+    if (body.password !== undefined) patch.passwordHash = await hashPassword(requirePassword(body.password));
+
+    await store.updateUser(target.id, patch);
+    if (patch.disabled === true) await store.deleteUserSessions(target.id);
+    res.json(adminUserView(await store.getUserById(target.id)));
   });
 
   // ----- images & static -----
@@ -359,8 +456,13 @@ function createApp({ db, databaseUrl, dataDir, adminPassword, countdownMsOverrid
 
   app.use(express.static(path.join(__dirname, '..', 'public')));
   app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'admin', 'index.html')));
-  app.get('/join', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'join.html')));
+  app.get('/play', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'play.html')));
   app.get('/room', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'room.html')));
+  app.get('/watch', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'room.html')));
+  app.get('/join', (req, res) => {
+    const qs = req.originalUrl.includes('?') ? `?${req.originalUrl.split('?')[1]}` : '';
+    res.redirect(302, `/${qs}`);
+  });
 
   app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 
@@ -369,7 +471,8 @@ function createApp({ db, databaseUrl, dataDir, adminPassword, countdownMsOverrid
     const status = err.status || err.statusCode || 500;
     const expected = err instanceof HttpError || status < 500;
     if (!expected) console.error(err);
-    res.status(status).json({ error: expected ? err.message : 'Something went wrong' });
+    const extra = expected && err.extra ? err.extra : undefined;
+    res.status(status).json({ error: expected ? err.message : 'Something went wrong', ...extra });
   });
 
   /** Wire up Socket.IO on the http.Server that serves this app: the room join/leave, cursor relay, and game protocol. */

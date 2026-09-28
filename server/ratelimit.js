@@ -37,6 +37,43 @@ function createLimiter({ max, windowMs }) {
   };
 }
 
+/**
+ * Tracks only FAILED attempts per key within a rolling window (e.g. login guessing). Unlike
+ * `createLimiter` above, `allowed(key)` must be checked BEFORE the attempt and `recordFailure(key)`
+ * called only once it actually fails — a caller decides what counts as a failure.
+ */
+function createFailureLimiter({ max, windowMs }) {
+  const hits = new Map(); // key -> { count, resetAt }
+
+  const prune = (now) => {
+    for (const [key, entry] of hits) {
+      if (entry.resetAt <= now) hits.delete(key);
+    }
+  };
+
+  const sweep = setInterval(() => prune(Date.now()), Math.max(windowMs, 1000));
+  sweep.unref();
+
+  return {
+    allowed(key) {
+      const entry = hits.get(key);
+      if (!entry) return true;
+      if (entry.resetAt <= Date.now()) {
+        hits.delete(key);
+        return true;
+      }
+      return entry.count < max;
+    },
+    recordFailure(key) {
+      const now = Date.now();
+      let entry = hits.get(key);
+      if (!entry || entry.resetAt <= now) entry = { count: 0, resetAt: now + windowMs };
+      entry.count += 1;
+      hits.set(key, entry);
+    },
+  };
+}
+
 // VERIFIED on Railway 2026-09-27 (runbook step R7): the edge discards any client-sent
 // X-Forwarded-For / X-Real-IP and sets `X-Forwarded-For: <client>, <edge proxy>` plus
 // `X-Real-IP: <client>`. The rightmost XFF entry is Railway's own edge (shared by many
@@ -55,4 +92,4 @@ function clientIp(req) {
   return req.socket?.remoteAddress || '';
 }
 
-module.exports = { createLimiter, clientIp };
+module.exports = { createLimiter, createFailureLimiter, clientIp };

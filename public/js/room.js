@@ -31,6 +31,10 @@
     revealClose: $('reveal-close'),
     kickedScreen: $('kicked-screen'),
     closedScreen: $('closed-screen'),
+    watchingBadge: $('watching-badge'),
+    watchingCount: $('watching-count'),
+    watchErrorScreen: $('watch-error-screen'),
+    watchErrorText: $('watch-error-text'),
     toast: $('toast'),
     sound: $('sound-toggle'),
   };
@@ -42,6 +46,13 @@
     revealing: 'Revealing the boxes…',
     finished: 'That’s everyone — check your box!',
     closed: 'This room has ended.',
+  };
+
+  // Watchers can't pick, so the player instructions above would tell them to do something they can't.
+  const WATCH_STATUS_TEXT = {
+    ...STATUS_TEXT,
+    picking: 'Players are picking their boxes…',
+    finished: 'That’s everyone — thanks for watching!',
   };
 
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -61,8 +72,24 @@
   const params = new URLSearchParams(location.search);
   const code = (params.get('code') || '').trim();
   if (!/^\d{6}$/.test(code)) {
-    location.href = '/join';
+    location.href = '/';
     return;
+  }
+
+  // /watch reuses this same page (server serves public/room.html for both /room and /watch) —
+  // the only difference is a POST /api/rooms/watch preflight before the socket room:join, and a
+  // view-only board once room:state reports `me.role === 'spectator'` (board.js already gates
+  // picking on that role for every viewer, host console included).
+  const isWatch = location.pathname === '/watch';
+
+  async function api(path, options = {}) {
+    const res = await fetch(path, {
+      ...options,
+      headers: { 'Content-Type': 'application/json', ...options.headers },
+    });
+    const data = res.status === 204 ? null : await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || 'Something went wrong. Please try again.');
+    return data;
   }
 
   let latestView = null;
@@ -79,6 +106,10 @@
   // server while `socket.data.roomId` was still null, coming back as a confusing "Only players
   // can act" toast instead of "still reconnecting". `rejoined` stays false across that gap.
   let rejoined = false;
+  // Gates the first `room:join` emit on /watch until POST /api/rooms/watch has succeeded —
+  // /room needs no such preflight (the landing page already created the player row), so this
+  // starts true there.
+  let watchReady = !isWatch;
 
   let toastTimer;
   function toast(message) {
@@ -103,6 +134,25 @@
 
   const socket = io({ transports: ['websocket', 'polling'] });
 
+  // Addendum B2: managed-room chat. Seated players compose; watchers are read-only (reactions
+  // only); the host is a distinct viewer this page never becomes. `isMine` only ever needs to
+  // recognize this visitor's OWN player messages — a host-authored message is never "mine" here.
+  const chat = window.Chat.create({
+    variant: 'floating',
+    getRole: () => (latestView && latestView.me ? latestView.me.role : null),
+    isMine: (m) => Boolean(m.authorRole === 'player' && latestView && latestView.me && m.playerId === latestView.me.id),
+    onSend: (text) => new Promise((resolve) => {
+      socket.emit('chat:send', { text }, (res) => resolve(res || { ok: false, error: 'Something went wrong. Please try again.' }));
+    }),
+    onReact: (emoji) => socket.emit('chat:react', { emoji }),
+    sound,
+    reducedMotion,
+  });
+  socket.on('chat:history', (list) => chat.history(list));
+  socket.on('chat:message', (msg) => chat.message(msg));
+  socket.on('chat:deleted', ({ id }) => chat.deleted(id));
+  socket.on('chat:reaction', (msg) => chat.reaction(msg));
+
   const board = window.Board.create(els.boxes, {
     interactive: true,
     showHands: true,
@@ -124,18 +174,41 @@
   });
 
   function joinRoom() {
+    // The "normal" room:join — /watch already created a spectator row via watchPreflight()
+    // below, so the server resolves the role from the visitor cookie exactly like /room does.
     socket.emit('room:join', { code }, (res) => {
       if (ended) return;
       if (!res || !res.ok) {
         ended = true;
-        location.href = `/join?code=${code}`;
+        if (isWatch) { showWatchError((res && res.error) || 'This room has no live board'); return; }
+        // No player row for this visitor in this room (e.g. a raw /room?code= link that skipped
+        // the landing page's name step) — send them through "/" to pick a name, code pre-filled.
+        location.href = `/?code=${code}`;
       }
     });
   }
 
+  /** /watch only: POST /api/rooms/watch must succeed before the socket ever emits room:join —
+   *  races against the socket's own connect so whichever finishes last is the one that joins. */
+  async function watchPreflight() {
+    try {
+      await api('/api/rooms/watch', { method: 'POST', body: JSON.stringify({ code }) });
+      watchReady = true;
+      if (socketConnected && !ended) joinRoom();
+    } catch (err) {
+      ended = true;
+      showWatchError(err.message);
+    }
+  }
+
+  function showWatchError(message) {
+    els.watchErrorText.textContent = message;
+    showTakeover(els.watchErrorScreen);
+  }
+
   socket.on('connect', () => {
     socketConnected = true;
-    if (!ended) joinRoom();
+    if (!ended && watchReady) joinRoom();
   });
   socket.on('room:state', handleState);
   socket.on('cursor', (msg) => board.handCursor(msg));
@@ -185,8 +258,10 @@
     renderHeader(view);
     renderStatus(view);
     renderPlayers(view);
+    renderWatchingCount(view);
     renderResults(view);
     renderClaim(view, isFirst);
+    chat.applyRoomState({ chatEnabled: view.chatEnabled });
     receivedFirstState = true;
   }
 
@@ -194,7 +269,12 @@
     document.title = `${view.title} — Room ${view.code}`;
     els.roomTitle.textContent = view.title;
     els.roomCode.textContent = view.code;
-    const me = view.me && view.me.id ? view.players.find((p) => p.id === view.me.id) : null;
+    // Addendum A: `view.players` now lists seated players only, so a spectator's own id is never
+    // in it — that's also exactly why "no name chip needed" for watchers (contract A2). A small
+    // "Watching" badge takes its place instead.
+    const isSpectator = Boolean(view.me && view.me.role === 'spectator');
+    els.watchingBadge.hidden = !isSpectator;
+    const me = !isSpectator && view.me && view.me.id ? view.players.find((p) => p.id === view.me.id) : null;
     if (me) {
       els.roomMe.hidden = false;
       els.roomMe.style.setProperty('--me-color', me.color);
@@ -206,11 +286,19 @@
     }
   }
 
+  /** Addendum A2: `players` no longer carries spectators at all — `spectatorCount` is the one
+   *  source of truth for "how many are watching" everywhere in the UI (host console included). */
+  function renderWatchingCount(view) {
+    const n = view.spectatorCount || 0;
+    els.watchingCount.hidden = n === 0;
+    els.watchingCount.textContent = n === 0 ? '' : `👀 ${n} watching`;
+  }
+
   let lastStatusText = null;
   function renderStatus(view) {
     const isSpectator = view.me && view.me.role === 'spectator';
     els.statusBanner.classList.toggle('spectator', Boolean(isSpectator));
-    let text = STATUS_TEXT[view.status] || '';
+    let text = (isSpectator ? WATCH_STATUS_TEXT : STATUS_TEXT)[view.status] || '';
     if (isSpectator) text = `You're watching. ${text}`;
     text = text.trim();
     // C2 (code audit): `room:state` (and this call) fires on every lock/pick, not just on a
@@ -223,16 +311,17 @@
   }
 
   function renderPlayers(view) {
+    // Addendum A2: `view.players` lists only seated (role `player`, not kicked) entries now —
+    // spectators are reported separately via `spectatorCount` (see renderWatchingCount).
     els.playerList.replaceChildren(
       ...view.players.map((p) => {
         const li = document.createElement('li');
         li.className = `player-chip${p.connected ? ' is-connected' : ''}${view.me && p.id === view.me.id ? ' is-self' : ''}`;
         li.style.setProperty('--chip-color', p.color);
-        const spectatorTag = p.role === 'spectator' ? '<span class="player-chip-spectator">watching</span>' : '';
         // NF-5 (round-2 audit): the dot alone was color-only AND aria-hidden — a screen-reader
         // user had no way to know who's connected. The dot stays decorative (its shape now also
         // differs, hollow vs filled — see room.css) and this sr-only text carries the meaning.
-        li.innerHTML = `<span class="player-chip-avatar">${esc(p.avatar)}</span><span class="player-chip-dot" aria-hidden="true"></span><span class="sr-only">${p.connected ? 'Online' : 'Away'}</span><span>${esc(p.name)}</span>${spectatorTag}`;
+        li.innerHTML = `<span class="player-chip-avatar">${esc(p.avatar)}</span><span class="player-chip-dot" aria-hidden="true"></span><span class="sr-only">${p.connected ? 'Online' : 'Away'}</span><span>${esc(p.name)}</span>`;
         return li;
       }),
     );
@@ -312,6 +401,7 @@
     closeClaim();
     if (els.main) els.main.inert = true;
     els.sound.inert = true;
+    chat.destroy(); // the session is over — drop the FAB/sheet and its socket listeners with it.
     screenEl.hidden = false;
     const card = screenEl.querySelector('.takeover-card');
     if (card) card.focus();
@@ -327,6 +417,8 @@
     els.revealCard.style.setProperty('--prize', (prize && prize.color) || '#ff6b5b');
     els.revealKicker.textContent = '🎉 You won 🎉';
     els.revealArt.replaceChildren(prizeArt(prize));
+    // B1: transparent PNGs/logos skip the tile/border — never true for an emoji-only prize.
+    els.revealArt.classList.toggle('no-border', Boolean(prize && prize.image && prize.imageBorder === false));
     els.revealTitle.textContent = prize ? prize.name : 'Out of stock';
     els.revealDesc.textContent = (prize && prize.description) || '';
     els.revealDesc.hidden = !(prize && prize.description);
@@ -423,6 +515,8 @@
     });
 
     setInterval(tickCountdown, 250);
+
+    if (isWatch) watchPreflight();
   }
 
   init();

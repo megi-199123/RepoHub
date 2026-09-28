@@ -11,67 +11,57 @@
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/tokens.css" />
   <link rel="stylesheet" href="/css/app.css" />
+  <link rel="stylesheet" href="/css/room.css" />
 </head>
 <body>
   <canvas id="stars" aria-hidden="true"></canvas>
   <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
 
-  <button id="sound-toggle" class="icon-btn sound-toggle" type="button" aria-pressed="true" aria-label="Toggle sound">
-    <svg class="on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 8.5a4.5 4.5 0 0 1 0 7M18.5 6a8 8 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-    <svg class="off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 9.5l5 5m0-5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-  </button>
+  <main class="join-page">
+    <form id="landing-form" class="card join-card" novalidate>
+      <div class="join-logo" aria-hidden="true">🎁</div>
+      <h1>Mystery Box</h1>
+      <p id="landing-lede" class="muted" aria-live="polite">Enter the 6-digit room code to play.</p>
 
-  <main class="app">
-    <header class="hero">
-      <div class="badge"><span class="dot"></span> Live prize draw</div>
-      <h1 id="title" class="title">Mystery Box</h1>
-      <p id="subtitle" class="subtitle"></p>
-    </header>
+      <div id="code-step" class="landing-step">
+        <div class="otp" id="otp" role="group" aria-label="Room code">
+          <input class="otp-digit" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" aria-label="Digit 1" data-i="0" />
+          <input class="otp-digit" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" aria-label="Digit 2" data-i="1" />
+          <input class="otp-digit" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" aria-label="Digit 3" data-i="2" />
+          <input class="otp-digit" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" aria-label="Digit 4" data-i="3" />
+          <input class="otp-digit" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" aria-label="Digit 5" data-i="4" />
+          <input class="otp-digit" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" aria-label="Digit 6" data-i="5" />
+        </div>
+      </div>
 
-    <section id="lineup" class="lineup" hidden aria-labelledby="lineup-heading">
-      <h2 id="lineup-heading" class="lineup-heading">What's inside?</h2>
-      <ul id="lineup-list" class="lineup-list"></ul>
-    </section>
+      <div id="name-step" class="landing-step" hidden>
+        <p class="landing-room-found">
+          <span id="found-title" class="landing-room-title"></span>
+          <button id="change-code" class="landing-change" type="button">Change code</button>
+        </p>
+        <label class="field">
+          <span>Your name</span>
+          <input id="join-name" type="text" maxlength="20" required autocomplete="off" placeholder="e.g. Alex" />
+        </label>
+        <a id="watch-link" class="landing-watch-link" href="#">Just watch →</a>
+      </div>
 
-    <section class="stage">
-      <p id="hint" class="hint" aria-live="polite">Loading…</p>
-      <div id="boxes" class="boxes" role="group" aria-label="Mystery boxes"></div>
-    </section>
+      <p id="landing-error" class="form-error" role="alert" hidden></p>
 
-    <div class="controls">
-      <button id="play" class="btn-primary" type="button" disabled>
+      <!-- Shown only when POST /api/rooms/join 409s with canWatch:true (seats full, or the
+           game is already revealing/finished) — Addendum A2. -->
+      <button id="watch-instead-btn" class="landing-watch-instead" type="button" hidden>Watch instead</button>
+
+      <button id="landing-btn" class="btn-primary btn-block" type="submit">
         <span class="btn-shine" aria-hidden="true"></span>
-        <span id="play-label">Shuffle &amp; Play</span>
+        <span id="landing-btn-label">Continue</span>
       </button>
-      <p id="plays-left" class="plays-left" tabindex="-1" hidden></p>
-    </div>
+
+      <a class="join-back" href="/admin">Host sign in →</a>
+    </form>
   </main>
 
-  <div id="reveal" class="reveal" hidden>
-    <div class="reveal-backdrop"></div>
-    <div class="reveal-card" role="dialog" aria-modal="true" aria-labelledby="reveal-title">
-      <div class="reveal-rays" aria-hidden="true"></div>
-      <p id="reveal-kicker" class="reveal-kicker">You won</p>
-      <div id="reveal-art" class="reveal-art"></div>
-      <h2 id="reveal-title" class="reveal-title"></h2>
-      <p id="reveal-desc" class="reveal-desc"></p>
-      <div id="reveal-claim" class="claim" hidden>
-        <span class="claim-label">Your claim code</span>
-        <button id="claim-code" class="claim-code" type="button" title="Copy code"></button>
-        <span class="claim-help">Show this code to our staff to claim your prize.</span>
-      </div>
-      <button id="reveal-close" class="btn-primary small" type="button">
-        <span class="btn-shine" aria-hidden="true"></span>
-        <span>See the other boxes</span>
-      </button>
-    </div>
-  </div>
-
-  <div id="toast" class="toast" role="status" hidden></div>
-  <canvas id="confetti" aria-hidden="true"></canvas>
-
   <script src="/js/fx.js"></script>
-  <script src="/js/boxes.js"></script>
-  <script src="/js/app.js"></script>
+  <script src="/js/landing.js"></script>
 </body>
 </html>

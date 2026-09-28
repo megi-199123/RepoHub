@@ -11,6 +11,11 @@
     lineup: $('lineup'),
     lineupList: $('lineup-list'),
     hint: $('hint'),
+    stage: document.querySelector('.stage'),
+    controls: document.querySelector('.controls'),
+    stateScreen: $('state-screen'),
+    stateTitle: $('state-title'),
+    stateMessage: $('state-message'),
     boxes: $('boxes'),
     play: $('play'),
     playLabel: $('play-label'),
@@ -30,6 +35,10 @@
 
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+  // Tenant rooms: this page is always reached as /play?code=XXXXXX — every game endpoint is
+  // scoped under that room code (see the frozen contract, "Public (players)").
+  const code = (new URLSearchParams(location.search).get('code') || '').trim();
+
   let config = null;
   let state = 'loading'; // idle | shuffling | picking | opening | revealed
   let round = null;
@@ -43,8 +52,29 @@
       headers: { 'Content-Type': 'application/json', ...options.headers },
     });
     const data = res.status === 204 ? null : await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data?.error || 'Something went wrong. Please try again.');
+    if (!res.ok) {
+      const err = new Error(data?.error || 'Something went wrong. Please try again.');
+      err.status = res.status;
+      throw err;
+    }
     return data;
+  }
+
+  /** Swap the whole page over to a friendly dead-end (missing/invalid code, room not found,
+   *  ended, hosted live, or rate-limited) with a link back to "/" to try another code — used
+   *  both at boot and if a room disappears mid-session (refreshConfig below). */
+  function showFriendlyState(message, title) {
+    state = 'blocked';
+    els.lineup.hidden = true;
+    if (els.stage) els.stage.hidden = true;
+    if (els.controls) els.controls.hidden = true;
+    // Unhide the aria-live region BEFORE writing its text — some screen readers only announce
+    // a live-region mutation if the region was already visible/in the render tree when it happened.
+    els.stateScreen.hidden = false;
+    els.stateTitle.textContent = title || "Can't join this room";
+    // The server message for a 404 is the same as the title ("Room not found"); do not repeat it.
+    els.stateMessage.textContent = message === title ? 'Check the code and try again.' : message;
+    document.title = title || 'Mystery Box';
   }
 
   let toastTimer;
@@ -82,6 +112,13 @@
     return document.createTextNode(prize.emoji || '🎁');
   }
 
+  /** B1: true when this prize's image should render with no tile/border/frame (a transparent
+   *  PNG or logo) — never true for an emoji-only prize. Toggled as a class on whichever
+   *  container (.lineup-art / .box-prize / .reveal-art) holds the art; see app.css. */
+  function noBorder(prize) {
+    return Boolean(prize && prize.image && prize.imageBorder === false);
+  }
+
   function renderPlaysLeft(playsLeft) {
     if (playsLeft === null || playsLeft === undefined) {
       els.playsLeft.hidden = true;
@@ -104,7 +141,7 @@
         li.style.setProperty('--i', i);
         li.style.setProperty('--c', p.color);
         const art = document.createElement('span');
-        art.className = 'lineup-art';
+        art.className = `lineup-art${noBorder(p) ? ' no-border' : ''}`;
         art.append(prizeArt(p));
         const name = document.createElement('span');
         name.className = 'lineup-name';
@@ -201,6 +238,7 @@
   function fillBox(box, prize, labelKind) {
     const slot = box.querySelector('.box-prize');
     slot.replaceChildren(prizeArt(prize));
+    slot.classList.toggle('no-border', noBorder(prize));
     box.querySelector('.box-label').textContent = prize.name;
     box.style.setProperty('--prize', prize.color);
     // C3 (code audit): box aria-labels used to stay "Open box N" forever, even once revealed
@@ -255,7 +293,7 @@
     try {
       await closeAllBoxes();
       const [newRound] = await Promise.all([
-        api('/api/rounds', { method: 'POST' }),
+        api(`/api/rooms/${code}/rounds`, { method: 'POST' }),
         shuffle(reducedMotion ? 1 : 7),
       ]);
       round = newRound;
@@ -302,7 +340,7 @@
 
     try {
       const [res] = await Promise.all([
-        api(`/api/rounds/${round.roundId}/pick`, { method: 'POST', body: JSON.stringify({ box: index }) }),
+        api(`/api/rooms/${code}/rounds/${round.roundId}/pick`, { method: 'POST', body: JSON.stringify({ box: index }) }),
         wait(reducedMotion ? 200 : 950),
       ]);
       result = res;
@@ -370,6 +408,7 @@
     els.revealCard.style.setProperty('--prize', prize.color);
     els.revealKicker.textContent = prize.winning ? '🎉 You won 🎉' : 'So close!';
     els.revealArt.replaceChildren(prizeArt(prize));
+    els.revealArt.classList.toggle('no-border', noBorder(prize));
     els.revealTitle.textContent = prize.name;
     els.revealDesc.textContent = prize.description || '';
     els.revealDesc.hidden = !prize.description;
@@ -422,7 +461,7 @@
 
   async function refreshConfig() {
     try {
-      config = await api('/api/config');
+      config = await api(`/api/rooms/${code}/config`);
       window.Boxes.setStyle(els.boxes, config.boxStyle);
       layout();
       renderLineup(config.prizes);
@@ -431,7 +470,15 @@
         els.play.disabled = true;
         els.playLabel.textContent = 'No plays left';
       }
-    } catch { /* keep the current view */ }
+    } catch (err) {
+      // The room disappeared (closed) or turned out to be a managed/hosted room mid-session —
+      // drop to the same friendly dead-end as a failed boot rather than leaving a stale board
+      // the player can no longer actually play.
+      if (err.status === 404 || err.status === 409) {
+        showFriendlyState(err.message, err.status === 404 ? 'Room not found' : 'This room has ended');
+      }
+      /* any other error (network hiccup, 429): keep the current view */
+    }
   }
 
   async function init() {
@@ -467,11 +514,21 @@
     let resizeTimer;
     addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(layout, 100); });
 
+    if (!/^\d{6}$/.test(code)) {
+      showFriendlyState('This link is missing a valid 6-digit room code.', 'Missing room code');
+      return;
+    }
+
     try {
-      config = await api('/api/config');
+      config = await api(`/api/rooms/${code}/config`);
     } catch (err) {
-      setHint('Could not load the game. Please refresh.');
-      toast(err.message);
+      // 404 room not found, 409 ended or "hosted live — join it with your name", 429 rate
+      // limited — all shown as the same friendly dead-end with a link back to "/".
+      const title = err.status === 404 ? 'Room not found'
+        : err.status === 409 ? 'Can’t play this room'
+        : err.status === 429 ? 'Too many attempts'
+        : 'Could not load the game';
+      showFriendlyState(err.message, title);
       return;
     }
 

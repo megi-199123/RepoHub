@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Mystery Box — Room</title>
+  <title>Mystery Box</title>
   <meta name="theme-color" content="#FFF8EE" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎁</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -11,7 +11,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/tokens.css" />
   <link rel="stylesheet" href="/css/app.css" />
-  <link rel="stylesheet" href="/css/room.css" />
 </head>
 <body>
   <canvas id="stars" aria-hidden="true"></canvas>
@@ -22,41 +21,42 @@
     <svg class="off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 9.5l5 5m0-5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
   </button>
 
-  <main class="room-app">
-    <header class="room-header">
-      <div class="room-title-block">
-        <h1 id="room-title" class="room-title">Mystery Box</h1>
-        <p class="room-code">Room <strong id="room-code"></strong></p>
-      </div>
-      <div id="room-me" class="room-me" hidden>
-        <span id="room-me-avatar" class="room-me-avatar"></span>
-        <span>
-          <span id="room-me-name" class="room-me-name"></span>
-          <span id="room-me-role" class="room-me-role"></span>
-        </span>
-      </div>
-      <span id="watching-badge" class="watching-badge" hidden>👀 Watching</span>
+  <main class="app">
+    <header class="hero">
+      <a id="back-link" class="back-link" href="/">← Enter another code</a>
+      <div class="badge"><span class="dot"></span> Live prize draw</div>
+      <h1 id="title" class="title">Mystery Box</h1>
+      <p id="subtitle" class="subtitle"></p>
     </header>
 
-    <p id="reconnect-banner" class="reconnect-banner" role="status" hidden></p>
+    <section id="lineup" class="lineup" hidden aria-labelledby="lineup-heading">
+      <h2 id="lineup-heading" class="lineup-heading">What's inside?</h2>
+      <ul id="lineup-list" class="lineup-list"></ul>
+    </section>
 
-    <p id="status-banner" class="status-banner" aria-live="polite">
-      <span id="status-text">Connecting…</span>
-      <span id="countdown-pill" class="countdown-pill" aria-hidden="true" hidden></span>
-    </p>
-    <p id="sr-announce" class="sr-only" aria-live="polite"></p>
-
-    <ul id="player-list" class="player-list"></ul>
-    <p id="watching-count" class="watching-count" hidden></p>
+    <section id="state-screen" class="state-screen" hidden aria-live="polite">
+      <div class="state-card">
+        <div class="state-emoji" aria-hidden="true">🙈</div>
+        <h2 id="state-title">Room not found</h2>
+        <p id="state-message" class="state-message"></p>
+        <a class="btn-primary small" href="/"><span>← Enter another code</span></a>
+      </div>
+    </section>
 
     <section class="stage">
+      <p id="hint" class="hint" aria-live="polite">Loading…</p>
       <div id="boxes" class="boxes" role="group" aria-label="Mystery boxes"></div>
     </section>
 
-    <ul id="results-list" class="results-list" hidden></ul>
+    <div class="controls">
+      <button id="play" class="btn-primary" type="button" disabled>
+        <span class="btn-shine" aria-hidden="true"></span>
+        <span id="play-label">Shuffle &amp; Play</span>
+      </button>
+      <p id="plays-left" class="plays-left" tabindex="-1" hidden></p>
+    </div>
   </main>
 
-  <!-- Own-prize celebration modal (markup pattern copied from public/index.html) -->
   <div id="reveal" class="reveal" hidden>
     <div class="reveal-backdrop"></div>
     <div class="reveal-card" role="dialog" aria-modal="true" aria-labelledby="reveal-title">
@@ -72,47 +72,16 @@
       </div>
       <button id="reveal-close" class="btn-primary small" type="button">
         <span class="btn-shine" aria-hidden="true"></span>
-        <span>Nice!</span>
+        <span>See the other boxes</span>
       </button>
-    </div>
-  </div>
-
-  <div id="kicked-screen" class="takeover" hidden>
-    <div class="takeover-card" tabindex="-1">
-      <div class="takeover-emoji" aria-hidden="true">🚪</div>
-      <h2>You were removed</h2>
-      <p>The host removed you from this room.</p>
-      <a class="btn-primary small" href="/"><span>Join another room</span></a>
-    </div>
-  </div>
-
-  <div id="closed-screen" class="takeover" hidden>
-    <div class="takeover-card" tabindex="-1">
-      <div class="takeover-emoji" aria-hidden="true">🔒</div>
-      <h2>This room has ended</h2>
-      <p>Thanks for playing!</p>
-      <a class="btn-primary small" href="/"><span>Join another room</span></a>
-    </div>
-  </div>
-
-  <!-- Shown only on /watch when POST /api/rooms/watch fails (room not found/ended/no live board). -->
-  <div id="watch-error-screen" class="takeover" hidden>
-    <div class="takeover-card" tabindex="-1">
-      <div class="takeover-emoji" aria-hidden="true">👀</div>
-      <h2>Can’t watch this room</h2>
-      <p id="watch-error-text"></p>
-      <a class="btn-primary small" href="/"><span>← Enter another code</span></a>
     </div>
   </div>
 
   <div id="toast" class="toast" role="status" hidden></div>
   <canvas id="confetti" aria-hidden="true"></canvas>
 
-  <script src="/socket.io/socket.io.min.js"></script>
   <script src="/js/fx.js"></script>
   <script src="/js/boxes.js"></script>
-  <script src="/js/board.js"></script>
-  <script src="/js/chat.js"></script>
-  <script src="/js/room.js"></script>
+  <script src="/js/app.js"></script>
 </body>
 </html>
